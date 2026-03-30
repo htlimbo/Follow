@@ -9,6 +9,7 @@ import {
   getStock, updateStock, deleteStock,
   getEntries, addEntry, deleteEntry,
   getAnchors, addAnchor, updateAnchor, deleteAnchor,
+  refreshPrices,
 } from '../store';
 
 const ENTRY_TYPES = {
@@ -460,6 +461,16 @@ export default function StockDetail() {
         setStock(s);
         const e = await getEntries(id);
         setEntries(e);
+
+        // 自动刷新现价
+        try {
+          const prices = await refreshPrices([s]);
+          const quote = prices[s.code];
+          if (quote && quote.price != null) {
+            const newPrice = String(quote.price);
+            setStock(prev => prev ? { ...prev, currentPrice: newPrice } : prev);
+          }
+        } catch { /* 行情刷新失败不影响页面 */ }
       } catch (err) {
         console.error('Failed to load stock:', err);
         navigate('/');

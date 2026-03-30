@@ -163,6 +163,42 @@ export async function deleteEntry(id) {
   if (error) throw error;
 }
 
+// ── Price refresh ──
+
+export async function refreshPrices(stocks) {
+  // 筛选出有6位纯数字代码的A股
+  const aStocks = stocks.filter(s => /^\d{6}$/.test(s.code));
+  if (aStocks.length === 0) return {};
+
+  const codes = aStocks.map(s => s.code).join(',');
+  const res = await fetch(`/api/quotes?codes=${codes}`);
+  if (!res.ok) return {};
+
+  const prices = await res.json();
+
+  // 批量更新数据库中的现价
+  const updates = [];
+  for (const stock of aStocks) {
+    const quote = prices[stock.code];
+    if (quote && quote.price != null) {
+      const newPrice = String(quote.price);
+      if (newPrice !== stock.currentPrice) {
+        updates.push(
+          supabase
+            .from('stocks')
+            .update({ current_price: newPrice })
+            .eq('id', stock.id)
+        );
+      }
+    }
+  }
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
+
+  return prices;
+}
+
 // ── Export / Import ──
 
 export async function exportData() {

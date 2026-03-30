@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, ChevronRight, X, TrendingUp, Eye, Archive, Briefcase, Download, Upload, ArrowUpDown } from 'lucide-react';
-import { getStocks, addStock, getAllEntries, exportData, importData } from '../store';
+import { Plus, ChevronRight, X, TrendingUp, Eye, Archive, Briefcase, Download, Upload, ArrowUpDown, RefreshCw } from 'lucide-react';
+import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices } from '../store';
 import { seedDemo } from '../seedDemo';
 
 const STATUS_CONFIG = {
@@ -167,6 +167,7 @@ export default function Portfolio() {
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('updated'); // updated | pnl | name
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -175,6 +176,20 @@ export default function Portfolio() {
         const [s, e] = await Promise.all([getStocks(), getAllEntries()]);
         setStocks(s);
         setEntries(e);
+
+        // 自动刷新A股现价
+        try {
+          const prices = await refreshPrices(s);
+          if (Object.keys(prices).length > 0) {
+            setStocks(prev => prev.map(stock => {
+              const quote = prices[stock.code];
+              if (quote && quote.price != null) {
+                return { ...stock, currentPrice: String(quote.price) };
+              }
+              return stock;
+            }));
+          }
+        } catch { /* 行情刷新失败不影响页面加载 */ }
       } catch (err) {
         console.error('Failed to load data:', err);
       } finally {
@@ -190,6 +205,26 @@ export default function Portfolio() {
       setStocks(prev => [stock, ...prev]);
     } catch (err) {
       console.error('Failed to add stock:', err);
+    }
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      const prices = await refreshPrices(stocks);
+      if (Object.keys(prices).length > 0) {
+        setStocks(prev => prev.map(stock => {
+          const quote = prices[stock.code];
+          if (quote && quote.price != null) {
+            return { ...stock, currentPrice: String(quote.price) };
+          }
+          return stock;
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to refresh prices:', err);
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -344,6 +379,10 @@ export default function Portfolio() {
               <option value="name">按名称</option>
             </select>
           </div>
+          <button onClick={handleRefresh} disabled={refreshing} title="刷新行情"
+            className="text-text-tertiary hover:text-text-secondary p-2 rounded-lg hover:bg-surface-hover transition-colors disabled:opacity-40">
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          </button>
           <button onClick={handleExport} title="导出数据"
             className="text-text-tertiary hover:text-text-secondary p-2 rounded-lg hover:bg-surface-hover transition-colors">
             <Download size={16} />
