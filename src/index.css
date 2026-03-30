@@ -22,6 +22,14 @@
   --font-mono: 'SF Mono', 'Fira Code', monospace;
 }
 
+/* A股模式：红涨绿跌 */
+.cn-market {
+  --color-positive: #dc2626;
+  --color-positive-light: #fef2f2;
+  --color-negative: #16a34a;
+  --color-negative-light: #f0fdf4;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);

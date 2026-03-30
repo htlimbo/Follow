@@ -78,7 +78,7 @@ function ResearchCard({ stock, onSave }) {
       {expanded && (
         <div className="px-4 pb-4">
           {/* Price grid */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
             <div>
               <label className="block text-xs text-text-tertiary mb-1">成本价</label>
               {editing ? (
@@ -164,7 +164,7 @@ function ResearchCard({ stock, onSave }) {
           </div>
 
           {/* Bull / Bear */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
               <label className="block text-xs text-text-tertiary mb-1">看好理由</label>
               {editing ? (
@@ -449,6 +449,7 @@ export default function StockDetail() {
   const [entries, setEntries] = useState([]);
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [entryFilter, setEntryFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -526,7 +527,7 @@ export default function StockDetail() {
       <AnchorsCard stockId={id} />
 
       {/* Timeline */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
         {!showAddEntry && (
           <button onClick={() => setShowAddEntry(true)}
@@ -535,6 +536,31 @@ export default function StockDetail() {
           </button>
         )}
       </div>
+
+      {/* Timeline type filter */}
+      {entries.length > 0 && (
+        <div className="flex items-center gap-1 mb-4 flex-wrap">
+          <button onClick={() => setEntryFilter('all')}
+            className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+              entryFilter === 'all' ? 'bg-accent-light text-accent font-medium' : 'text-text-tertiary hover:bg-surface-hover'
+            }`}>
+            全部
+          </button>
+          {Object.entries(ENTRY_TYPES).map(([key, cfg]) => {
+            const Icon = cfg.icon;
+            const count = entries.filter(e => e.type === key).length;
+            if (count === 0) return null;
+            return (
+              <button key={key} onClick={() => setEntryFilter(key)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                  entryFilter === key ? `${cfg.bg} ${cfg.color} font-medium` : 'text-text-tertiary hover:bg-surface-hover'
+                }`}>
+                <Icon size={11} /> {cfg.label} <span className="opacity-60">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} />}
 
@@ -546,7 +572,7 @@ export default function StockDetail() {
         </div>
       ) : (
         <div className="mt-2">
-          {entries.map(entry => (
+          {(entryFilter === 'all' ? entries : entries.filter(e => e.type === entryFilter)).map(entry => (
             <TimelineEntry key={entry.id} entry={entry} onDelete={handleDeleteEntry} />
           ))}
         </div>

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, ChevronRight, X, TrendingUp, Eye, Archive, Briefcase, Download, Upload } from 'lucide-react';
+import { Plus, ChevronRight, X, TrendingUp, Eye, Archive, Briefcase, Download, Upload, ArrowUpDown } from 'lucide-react';
 import { getStocks, addStock, getAllEntries, exportData, importData } from '../store';
+import { seedDemo } from '../seedDemo';
 
 const STATUS_CONFIG = {
   holding: { label: '持仓', icon: Briefcase, color: 'text-accent', bg: 'bg-accent-light' },
@@ -76,7 +77,7 @@ function formatMoney(value) {
   return value.toFixed(2);
 }
 
-function StockCard({ stock, latestEntry }) {
+function StockCard({ stock, latestEntry, entryCount }) {
   const cfg = STATUS_CONFIG[stock.status] || STATUS_CONFIG.holding;
   const StatusIcon = cfg.icon;
 
@@ -130,7 +131,10 @@ function StockCard({ stock, latestEntry }) {
         {latestEntry ? (
           <div className="pt-3 border-t border-border-light">
             <p className="text-sm text-text-secondary leading-relaxed line-clamp-2">{latestEntry.content}</p>
-            <p className="text-xs text-text-tertiary mt-1.5">{formatTime(latestEntry.createdAt)}</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="text-xs text-text-tertiary">{formatTime(latestEntry.createdAt)}</span>
+              {entryCount > 1 && <span className="text-xs text-text-tertiary">共{entryCount}条记录</span>}
+            </div>
           </div>
         ) : (
           <div className="pt-3 border-t border-border-light">
@@ -161,6 +165,7 @@ export default function Portfolio() {
   const [entries, setEntries] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('updated'); // updated | pnl | name
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef(null);
 
@@ -221,11 +226,30 @@ export default function Portfolio() {
     e.target.value = '';
   }
 
-  const filtered = filter === 'all' ? stocks : stocks.filter(s => s.status === filter);
-
   const latestEntryMap = {};
+  const entryCountMap = {};
   entries.forEach(e => {
     if (!latestEntryMap[e.stockId]) latestEntryMap[e.stockId] = e;
+    entryCountMap[e.stockId] = (entryCountMap[e.stockId] || 0) + 1;
+  });
+
+  function getPnlPct(s) {
+    const cost = parseFloat(s.costPrice);
+    const current = parseFloat(s.currentPrice);
+    if (isNaN(cost) || isNaN(current) || cost <= 0) return -Infinity;
+    return (current - cost) / cost * 100;
+  }
+
+  function getLastActivity(s) {
+    const entry = latestEntryMap[s.id];
+    return entry ? new Date(entry.createdAt).getTime() : new Date(s.updatedAt).getTime();
+  }
+
+  const baseList = filter === 'all' ? stocks : stocks.filter(s => s.status === filter);
+  const filtered = [...baseList].sort((a, b) => {
+    if (sortBy === 'pnl') return getPnlPct(b) - getPnlPct(a);
+    if (sortBy === 'name') return a.name.localeCompare(b.name, 'zh-CN');
+    return getLastActivity(b) - getLastActivity(a);
   });
 
   // Portfolio summary
@@ -261,22 +285,22 @@ export default function Portfolio() {
     <div>
       {/* Stats */}
       {holdingStocks.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-surface rounded-xl border border-border p-3.5">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
+          <div className="bg-surface rounded-xl border border-border p-2.5 sm:p-3.5">
             <p className="text-xs text-text-tertiary mb-1">持仓数量</p>
-            <p className="text-xl font-semibold">{holdingStocks.length}</p>
+            <p className="text-lg sm:text-xl font-semibold">{holdingStocks.length}</p>
           </div>
-          <div className="bg-surface rounded-xl border border-border p-3.5">
+          <div className="bg-surface rounded-xl border border-border p-2.5 sm:p-3.5">
             <p className="text-xs text-text-tertiary mb-1">总市值</p>
-            <p className="text-xl font-semibold">
+            <p className="text-lg sm:text-xl font-semibold truncate">
               {hasPnlData ? formatMoney(totalMarketValue) : '—'}
             </p>
           </div>
-          <div className="bg-surface rounded-xl border border-border p-3.5">
+          <div className="bg-surface rounded-xl border border-border p-2.5 sm:p-3.5">
             <p className="text-xs text-text-tertiary mb-1">总盈亏</p>
             {hasPnlData ? (
               <div>
-                <p className={`text-xl font-semibold ${totalPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
+                <p className={`text-lg sm:text-xl font-semibold truncate ${totalPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {totalPnl >= 0 ? '+' : ''}{formatMoney(totalPnl)}
                 </p>
                 <p className={`text-xs ${totalPnlPct >= 0 ? 'text-positive' : 'text-negative'}`}>
@@ -284,14 +308,14 @@ export default function Portfolio() {
                 </p>
               </div>
             ) : (
-              <p className="text-xl font-semibold">—</p>
+              <p className="text-lg sm:text-xl font-semibold">—</p>
             )}
           </div>
         </div>
       )}
 
       {/* Header + filter */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-1">
           {[
             { key: 'all', label: '全部' },
@@ -300,14 +324,26 @@ export default function Portfolio() {
             { key: 'closed', label: '已清仓' },
           ].map(f => (
             <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-sm transition-colors ${
                 filter === f.key ? 'bg-accent-light text-accent font-medium' : 'text-text-secondary hover:bg-surface-hover'
               }`}>
               {f.label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-0.5 text-text-tertiary">
+            <ArrowUpDown size={13} />
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="text-xs bg-transparent border-none outline-none cursor-pointer text-text-secondary py-1 pr-1"
+            >
+              <option value="updated">最近活跃</option>
+              <option value="pnl">按盈亏</option>
+              <option value="name">按名称</option>
+            </select>
+          </div>
           <button onClick={handleExport} title="导出数据"
             className="text-text-tertiary hover:text-text-secondary p-2 rounded-lg hover:bg-surface-hover transition-colors">
             <Download size={16} />
@@ -333,14 +369,29 @@ export default function Portfolio() {
           <p className="text-text-secondary mb-1">
             {stocks.length === 0 ? '还没有添加股票' : '这个分类下没有股票'}
           </p>
-          <p className="text-sm text-text-tertiary">
+          <p className="text-sm text-text-tertiary mb-4">
             {stocks.length === 0 ? '点击上方「添加」开始跟踪你的投资思考' : '切换筛选条件试试'}
           </p>
+          {stocks.length === 0 && (
+            <button
+              onClick={async () => {
+                setLoading(true);
+                await seedDemo();
+                const [s, e] = await Promise.all([getStocks(), getAllEntries()]);
+                setStocks(s);
+                setEntries(e);
+                setLoading(false);
+              }}
+              className="text-sm text-accent hover:underline"
+            >
+              或者加载演示数据看看效果
+            </button>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           {filtered.map(stock => (
-            <StockCard key={stock.id} stock={stock} latestEntry={latestEntryMap[stock.id]} />
+            <StockCard key={stock.id} stock={stock} latestEntry={latestEntryMap[stock.id]} entryCount={entryCountMap[stock.id] || 0} />
           ))}
         </div>
       )}
