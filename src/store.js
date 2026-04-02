@@ -170,11 +170,26 @@ export async function refreshPrices(stocks) {
   const aStocks = stocks.filter(s => /^\d{6}$/.test(s.code));
   if (aStocks.length === 0) return {};
 
-  const codes = aStocks.map(s => s.code).join(',');
-  const res = await fetch(`/api/quotes?codes=${codes}`);
+  // 转换为东方财富 secid 格式：沪市(6开头) → 1.XXXXXX，深市(0/3开头) → 0.XXXXXX
+  const secids = aStocks
+    .map(s => (s.code.startsWith('6') ? `1.${s.code}` : `0.${s.code}`))
+    .join(',');
+
+  const url = `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f2,f3,f12,f14&secids=${secids}`;
+  const res = await fetch(url, {
+    headers: { 'Referer': 'https://quote.eastmoney.com/' },
+  });
   if (!res.ok) return {};
 
-  const prices = await res.json();
+  const data = await res.json();
+  const prices = {};
+  if (data.data?.diff) {
+    for (const item of data.data.diff) {
+      if (item.f2 !== '-') {
+        prices[item.f12] = { price: item.f2, change: item.f3, name: item.f14 };
+      }
+    }
+  }
 
   // 批量更新数据库中的现价
   const updates = [];
