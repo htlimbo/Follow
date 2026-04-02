@@ -1,10 +1,8 @@
-/**
- * Vercel Serverless Function — 获取A股实时行情
- * 使用东方财富 push API，返回 JSON 格式的股票现价
- *
- * GET /api/quotes?codes=300750,600519,002594
- */
-export async function GET(request) {
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(request) {
   const url = new URL(request.url);
   const codes = url.searchParams.get('codes');
 
@@ -22,7 +20,9 @@ export async function GET(request) {
     .join(',');
 
   if (!secids) {
-    return Response.json({});
+    return new Response('{}', {
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -45,10 +45,16 @@ export async function GET(request) {
       }
     }
 
-    return Response.json(prices, {
-      headers: { 'Cache-Control': 's-maxage=30, stale-while-revalidate=60' },
+    return new Response(JSON.stringify(prices), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 's-maxage=30, stale-while-revalidate=60',
+      },
     });
   } catch (err) {
-    return Response.json({ error: 'Failed to fetch quotes' }, { status: 502 });
+    return new Response(JSON.stringify({ error: 'Failed to fetch quotes' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
