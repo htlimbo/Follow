@@ -55,9 +55,9 @@ function ResearchCard({ stock, onSave }) {
   const cost = parseFloat(form.costPrice);
   const current = parseFloat(form.currentPrice);
   const shares = parseFloat(form.shares);
-  const hasPrice = !isNaN(cost) && !isNaN(current) && cost > 0;
+  const hasPrice = !isNaN(cost) && !isNaN(current) && cost !== 0;
   const hasShares = !isNaN(shares) && shares > 0;
-  const pnlPct = hasPrice ? ((current - cost) / cost * 100) : null;
+  const pnlPct = hasPrice ? ((current - cost) / Math.abs(cost) * 100) : null;
   const pnlAmount = hasPrice && hasShares ? (current - cost) * shares : null;
   const marketValue = !isNaN(current) && hasShares ? current * shares : null;
 
@@ -531,63 +531,67 @@ export default function StockDetail() {
         </button>
       </div>
 
-      {/* Research Card */}
-      <ResearchCard stock={stock} onSave={handleSaveResearch} />
+      {/* Desktop: left-right layout; Mobile: stacked */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-6">
+        {/* Left: Research + Anchors */}
+        <div>
+          <ResearchCard stock={stock} onSave={handleSaveResearch} />
+          <AnchorsCard stockId={id} />
+        </div>
 
-      {/* Tracking Anchors */}
-      <AnchorsCard stockId={id} />
-
-      {/* Timeline */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
-        {!showAddEntry && (
-          <button onClick={() => setShowAddEntry(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-accent hover:bg-accent-light transition-colors">
-            <Plus size={14} /> 记录想法
-          </button>
-        )}
-      </div>
-
-      {/* Timeline type filter */}
-      {entries.length > 0 && (
-        <div className="flex items-center gap-1 mb-4 flex-wrap">
-          <button onClick={() => setEntryFilter('all')}
-            className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
-              entryFilter === 'all' ? 'bg-accent-light text-accent font-medium' : 'text-text-tertiary hover:bg-surface-hover'
-            }`}>
-            全部
-          </button>
-          {Object.entries(ENTRY_TYPES).map(([key, cfg]) => {
-            const Icon = cfg.icon;
-            const count = entries.filter(e => e.type === key).length;
-            if (count === 0) return null;
-            return (
-              <button key={key} onClick={() => setEntryFilter(key)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-colors ${
-                  entryFilter === key ? `${cfg.bg} ${cfg.color} font-medium` : 'text-text-tertiary hover:bg-surface-hover'
-                }`}>
-                <Icon size={11} /> {cfg.label} <span className="opacity-60">{count}</span>
+        {/* Right: Timeline */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
+            {!showAddEntry && (
+              <button onClick={() => setShowAddEntry(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-accent hover:bg-accent-light transition-colors">
+                <Plus size={14} /> 记录想法
               </button>
-            );
-          })}
-        </div>
-      )}
+            )}
+          </div>
 
-      {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} />}
+          {entries.length > 0 && (
+            <div className="flex items-center gap-1 mb-4 flex-wrap">
+              <button onClick={() => setEntryFilter('all')}
+                className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                  entryFilter === 'all' ? 'bg-accent-light text-accent font-medium' : 'text-text-tertiary hover:bg-surface-hover'
+                }`}>
+                全部
+              </button>
+              {Object.entries(ENTRY_TYPES).map(([key, cfg]) => {
+                const Icon = cfg.icon;
+                const count = entries.filter(e => e.type === key).length;
+                if (count === 0) return null;
+                return (
+                  <button key={key} onClick={() => setEntryFilter(key)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                      entryFilter === key ? `${cfg.bg} ${cfg.color} font-medium` : 'text-text-tertiary hover:bg-surface-hover'
+                    }`}>
+                    <Icon size={11} /> {cfg.label} <span className="opacity-60">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-      {entries.length === 0 ? (
-        <div className="text-center py-12">
-          <Brain size={32} className="text-text-tertiary mx-auto mb-3" />
-          <p className="text-sm text-text-secondary mb-1">还没有思考记录</p>
-          <p className="text-xs text-text-tertiary">记录每一次判断和操作背后的想法</p>
+          {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} />}
+
+          {entries.length === 0 ? (
+            <div className="text-center py-12">
+              <Brain size={32} className="text-text-tertiary mx-auto mb-3" />
+              <p className="text-sm text-text-secondary mb-1">还没有思考记录</p>
+              <p className="text-xs text-text-tertiary">记录每一次判断和操作背后的想法</p>
+            </div>
+          ) : (
+            <div className="mt-2">
+              {(entryFilter === 'all' ? entries : entries.filter(e => e.type === entryFilter)).map(entry => (
+                <TimelineEntry key={entry.id} entry={entry} onDelete={handleDeleteEntry} />
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="mt-2">
-          {(entryFilter === 'all' ? entries : entries.filter(e => e.type === entryFilter)).map(entry => (
-            <TimelineEntry key={entry.id} entry={entry} onDelete={handleDeleteEntry} />
-          ))}
-        </div>
-      )}
+      </div>
 
       {/* Delete confirmation */}
       {showDeleteConfirm && (

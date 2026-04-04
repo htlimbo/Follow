@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, ChevronRight, X, TrendingUp, Eye, Archive, Briefcase, Download, Upload, ArrowUpDown, RefreshCw } from 'lucide-react';
-import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices } from '../store';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices, searchStock } from '../store';
 import { seedDemo } from '../seedDemo';
+
+const CHART_COLORS = ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#6366f1', '#0d9488'];
 
 const STATUS_CONFIG = {
   holding: { label: '持仓', icon: Briefcase, color: 'text-accent', bg: 'bg-accent-light' },
@@ -14,6 +17,26 @@ function AddStockModal({ onClose, onAdd }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [status, setStatus] = useState('holding');
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState(null); // { code, name, market } | 'not_found'
+  const searchTimer = useRef(null);
+
+  function handleCodeChange(val) {
+    setCode(val);
+    setSearchResult(null);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const trimmed = val.trim();
+    if (!trimmed) return;
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const result = await searchStock(trimmed);
+        setSearchResult(result || 'not_found');
+        if (result && !name.trim()) setName(result.name);
+      } catch { setSearchResult('not_found'); }
+      finally { setSearching(false); }
+    }, 500);
+  }
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -33,13 +56,20 @@ function AddStockModal({ onClose, onAdd }) {
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="block text-sm text-text-secondary mb-1.5">股票名称</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="如：宁德时代" autoFocus
+            <label className="block text-sm text-text-secondary mb-1.5">股票代码</label>
+            <input type="text" value={code} onChange={e => handleCodeChange(e.target.value)} placeholder="如：300750 或 00700" autoFocus
               className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent transition-colors" />
+            {searching && <p className="text-xs text-text-tertiary mt-1">查询中...</p>}
+            {searchResult === 'not_found' && <p className="text-xs text-negative mt-1">未找到该股票代码</p>}
+            {searchResult && searchResult !== 'not_found' && (
+              <p className="text-xs text-positive mt-1">
+                {searchResult.name}（{searchResult.market === 'HK' ? '港股' : 'A股'}）
+              </p>
+            )}
           </div>
           <div>
-            <label className="block text-sm text-text-secondary mb-1.5">股票代码</label>
-            <input type="text" value={code} onChange={e => setCode(e.target.value)} placeholder="如：300750"
+            <label className="block text-sm text-text-secondary mb-1.5">股票名称</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="输入代码后自动填充"
               className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent transition-colors" />
           </div>
           <div>
@@ -84,9 +114,9 @@ function StockCard({ stock, latestEntry, entryCount }) {
   const cost = parseFloat(stock.costPrice);
   const current = parseFloat(stock.currentPrice);
   const shares = parseFloat(stock.shares);
-  const hasPrice = !isNaN(cost) && !isNaN(current) && cost > 0;
+  const hasPrice = !isNaN(cost) && !isNaN(current) && cost !== 0;
   const hasShares = !isNaN(shares) && shares > 0;
-  const pnlPct = hasPrice ? ((current - cost) / cost * 100) : null;
+  const pnlPct = hasPrice ? ((current - cost) / Math.abs(cost) * 100) : null;
   const pnlAmount = hasPrice && hasShares ? (current - cost) * shares : null;
 
   return (
@@ -271,8 +301,8 @@ export default function Portfolio() {
   function getPnlPct(s) {
     const cost = parseFloat(s.costPrice);
     const current = parseFloat(s.currentPrice);
-    if (isNaN(cost) || isNaN(current) || cost <= 0) return -Infinity;
-    return (current - cost) / cost * 100;
+    if (isNaN(cost) || isNaN(current) || cost === 0) return -Infinity;
+    return (current - cost) / Math.abs(cost) * 100;
   }
 
   function getLastActivity(s) {
@@ -298,7 +328,7 @@ export default function Portfolio() {
     const cost = parseFloat(s.costPrice);
     const current = parseFloat(s.currentPrice);
     const shares = parseFloat(s.shares);
-    if (!isNaN(cost) && !isNaN(current) && !isNaN(shares) && cost > 0 && shares > 0) {
+    if (!isNaN(cost) && !isNaN(current) && !isNaN(shares) && cost !== 0 && shares > 0) {
       totalMarketValue += current * shares;
       totalCost += cost * shares;
       totalPnl += (current - cost) * shares;
@@ -306,7 +336,8 @@ export default function Portfolio() {
     }
   });
 
-  const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost * 100) : 0;
+  const totalAbsCost = Math.abs(totalCost);
+  const totalPnlPct = totalAbsCost > 0 ? (totalPnl / totalAbsCost * 100) : 0;
 
   if (loading) {
     return (
@@ -316,39 +347,26 @@ export default function Portfolio() {
     );
   }
 
+  // Chart data: holding distribution (pie) & per-stock P&L (bar)
+  const pieData = [];
+  const barData = [];
+  holdingStocks.forEach(s => {
+    const current = parseFloat(s.currentPrice);
+    const shares = parseFloat(s.shares);
+    const cost = parseFloat(s.costPrice);
+    if (!isNaN(current) && !isNaN(shares) && shares > 0) {
+      const mv = current * shares;
+      pieData.push({ name: s.name, value: Math.round(mv) });
+    }
+    if (!isNaN(cost) && !isNaN(current) && !isNaN(shares) && cost !== 0 && shares > 0) {
+      const pnl = (current - cost) * shares;
+      barData.push({ name: s.name, pnl: Math.round(pnl) });
+    }
+  });
+  barData.sort((a, b) => b.pnl - a.pnl);
+
   return (
     <div>
-      {/* Stats */}
-      {holdingStocks.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
-          <div className="bg-surface rounded-xl border border-border p-2.5 sm:p-3.5">
-            <p className="text-xs text-text-tertiary mb-1">持仓数量</p>
-            <p className="text-lg sm:text-xl font-semibold">{holdingStocks.length}</p>
-          </div>
-          <div className="bg-surface rounded-xl border border-border p-2.5 sm:p-3.5">
-            <p className="text-xs text-text-tertiary mb-1">总市值</p>
-            <p className="text-lg sm:text-xl font-semibold truncate">
-              {hasPnlData ? formatMoney(totalMarketValue) : '—'}
-            </p>
-          </div>
-          <div className="bg-surface rounded-xl border border-border p-2.5 sm:p-3.5">
-            <p className="text-xs text-text-tertiary mb-1">总盈亏</p>
-            {hasPnlData ? (
-              <div>
-                <p className={`text-lg sm:text-xl font-semibold truncate ${totalPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {totalPnl >= 0 ? '+' : ''}{formatMoney(totalPnl)}
-                </p>
-                <p className={`text-xs ${totalPnlPct >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {formatPnl(totalPnlPct)}
-                </p>
-              </div>
-            ) : (
-              <p className="text-lg sm:text-xl font-semibold">—</p>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Header + filter */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-1">
@@ -399,41 +417,125 @@ export default function Portfolio() {
         </div>
       </div>
 
-      {/* Stock list */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center mx-auto mb-4">
-            <TrendingUp size={24} className="text-text-tertiary" />
-          </div>
-          <p className="text-text-secondary mb-1">
-            {stocks.length === 0 ? '还没有添加股票' : '这个分类下没有股票'}
-          </p>
-          <p className="text-sm text-text-tertiary mb-4">
-            {stocks.length === 0 ? '点击上方「添加」开始跟踪你的投资思考' : '切换筛选条件试试'}
-          </p>
-          {stocks.length === 0 && (
-            <button
-              onClick={async () => {
-                setLoading(true);
-                await seedDemo();
-                const [s, e] = await Promise.all([getStocks(), getAllEntries()]);
-                setStocks(s);
-                setEntries(e);
-                setLoading(false);
-              }}
-              className="text-sm text-accent hover:underline"
-            >
-              或者加载演示数据看看效果
-            </button>
+      {/* Desktop: left-right layout; Mobile: stacked */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+        {/* Left: Stock list */}
+        <div>
+          {filtered.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center mx-auto mb-4">
+                <TrendingUp size={24} className="text-text-tertiary" />
+              </div>
+              <p className="text-text-secondary mb-1">
+                {stocks.length === 0 ? '还没有添加股票' : '这个分类下没有股票'}
+              </p>
+              <p className="text-sm text-text-tertiary mb-4">
+                {stocks.length === 0 ? '点击上方「添加」开始跟踪你的投资思考' : '切换筛选条件试试'}
+              </p>
+              {stocks.length === 0 && (
+                <button
+                  onClick={async () => {
+                    setLoading(true);
+                    await seedDemo();
+                    const [s, e] = await Promise.all([getStocks(), getAllEntries()]);
+                    setStocks(s);
+                    setEntries(e);
+                    setLoading(false);
+                  }}
+                  className="text-sm text-accent hover:underline"
+                >
+                  或者加载演示数据看看效果
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {filtered.map(stock => (
+                <StockCard key={stock.id} stock={stock} latestEntry={latestEntryMap[stock.id]} entryCount={entryCountMap[stock.id] || 0} />
+              ))}
+            </div>
           )}
         </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {filtered.map(stock => (
-            <StockCard key={stock.id} stock={stock} latestEntry={latestEntryMap[stock.id]} entryCount={entryCountMap[stock.id] || 0} />
-          ))}
-        </div>
-      )}
+
+        {/* Right: Stats + Charts (only when there are holding stocks with data) */}
+        {holdingStocks.length > 0 && (
+          <div className="flex flex-col gap-4">
+            {/* Stats cards */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-surface rounded-xl border border-border p-2.5">
+                <p className="text-xs text-text-tertiary mb-1">持仓</p>
+                <p className="text-lg font-semibold">{holdingStocks.length}</p>
+              </div>
+              <div className="bg-surface rounded-xl border border-border p-2.5">
+                <p className="text-xs text-text-tertiary mb-1">总市值</p>
+                <p className="text-lg font-semibold truncate">
+                  {hasPnlData ? formatMoney(totalMarketValue) : '—'}
+                </p>
+              </div>
+              <div className="bg-surface rounded-xl border border-border p-2.5">
+                <p className="text-xs text-text-tertiary mb-1">总盈亏</p>
+                {hasPnlData ? (
+                  <div>
+                    <p className={`text-lg font-semibold truncate ${totalPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
+                      {totalPnl >= 0 ? '+' : ''}{formatMoney(totalPnl)}
+                    </p>
+                    <p className={`text-xs ${totalPnlPct >= 0 ? 'text-positive' : 'text-negative'}`}>
+                      {formatPnl(totalPnlPct)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-lg font-semibold">—</p>
+                )}
+              </div>
+            </div>
+
+            {/* Pie chart: position distribution */}
+            {pieData.length > 0 && (
+              <div className="bg-surface rounded-xl border border-border p-4">
+                <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">持仓分布</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                      outerRadius={75} innerRadius={40} paddingAngle={2} stroke="none">
+                      {pieData.map((_, i) => (
+                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => formatMoney(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                  {pieData.map((d, i) => (
+                    <span key={d.name} className="flex items-center gap-1 text-xs text-text-secondary">
+                      <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                      {d.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Bar chart: per-stock P&L */}
+            {barData.length > 0 && (
+              <div className="bg-surface rounded-xl border border-border p-4">
+                <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">个股盈亏</h3>
+                <ResponsiveContainer width="100%" height={Math.max(150, barData.length * 36)}>
+                  <BarChart data={barData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
+                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => formatMoney(v)} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={64} />
+                    <Tooltip formatter={(v) => formatMoney(v)} />
+                    <Bar dataKey="pnl" radius={[0, 4, 4, 0]}>
+                      {barData.map((d, i) => (
+                        <Cell key={i} fill={d.pnl >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {showAdd && <AddStockModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />}
     </div>

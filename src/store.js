@@ -166,34 +166,52 @@ export async function deleteEntry(id) {
 // ── Price refresh ──
 
 export async function refreshPrices(stocks) {
-  // 筛选出有6位纯数字代码的A股
-  const aStocks = stocks.filter(s => /^\d{6}$/.test(s.code));
-  if (aStocks.length === 0) return {};
-
-  // 转换为东方财富 secid 格式：沪市(6开头) → 1.XXXXXX，深市(0/3开头) → 0.XXXXXX
-  const secids = aStocks
-    .map(s => (s.code.startsWith('6') ? `1.${s.code}` : `0.${s.code}`))
-    .join(',');
-
-  const url = `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f2,f3,f12,f14&secids=${secids}`;
-  const res = await fetch(url, {
-    headers: { 'Referer': 'https://quote.eastmoney.com/' },
-  });
-  if (!res.ok) return {};
-
-  const data = await res.json();
   const prices = {};
-  if (data.data?.diff) {
-    for (const item of data.data.diff) {
-      if (item.f2 !== '-') {
-        prices[item.f12] = { price: item.f2, change: item.f3, name: item.f14 };
+
+  // A股：6位纯数字，批量查询
+  const aStocks = stocks.filter(s => /^\d{6}$/.test(s.code));
+  if (aStocks.length > 0) {
+    const secids = aStocks
+      .map(s => (s.code.startsWith('6') ? `1.${s.code}` : `0.${s.code}`))
+      .join(',');
+    const url = `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f2,f3,f12,f14&secids=${secids}`;
+    try {
+      const res = await fetch(url, { headers: { 'Referer': 'https://quote.eastmoney.com/' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.data?.diff) {
+          for (const item of data.data.diff) {
+            if (item.f2 !== '-') {
+              prices[item.f12] = { price: item.f2, change: item.f3, name: item.f14 };
+            }
+          }
+        }
       }
-    }
+    } catch { /* A股行情失败不阻断 */ }
+  }
+
+  // 港股：5位数字代码，逐只查询（qt/stock/get 不支持批量）
+  const hkStocks = stocks.filter(s => /^\d{5}$/.test(s.code));
+  if (hkStocks.length > 0) {
+    const hkPromises = hkStocks.map(async (s) => {
+      try {
+        const secid = `116.${s.code}`;
+        const url = `https://push2.eastmoney.com/api/qt/stock/get?fltt=2&fields=f43,f57,f58,f169&secid=${secid}`;
+        const res = await fetch(url, { headers: { 'Referer': 'https://quote.eastmoney.com/' } });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.data?.f43 != null) {
+          prices[s.code] = { price: data.data.f43, change: data.data.f169, name: data.data.f58 };
+        }
+      } catch { /* 单只港股失败不影响其他 */ }
+    });
+    await Promise.all(hkPromises);
   }
 
   // 批量更新数据库中的现价
+  const allStocks = [...aStocks, ...hkStocks];
   const updates = [];
-  for (const stock of aStocks) {
+  for (const stock of allStocks) {
     const quote = prices[stock.code];
     if (quote && quote.price != null) {
       const newPrice = String(quote.price);
@@ -212,6 +230,40 @@ export async function refreshPrices(stocks) {
   }
 
   return prices;
+}
+
+// ── Stock search / validate ──
+
+export async function searchStock(code) {
+  code = code.trim();
+  if (!code) return null;
+
+  // A股：6位纯数字
+  if (/^\d{6}$/.test(code)) {
+    const secid = code.startsWith('6') ? `1.${code}` : `0.${code}`;
+    const url = `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f2,f12,f14&secids=${secid}`;
+    const res = await fetch(url, { headers: { 'Referer': 'https://quote.eastmoney.com/' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const item = data.data?.diff?.[0];
+    if (item && item.f14) return { code: item.f12, name: item.f14, market: 'A' };
+    return null;
+  }
+
+  // 港股：纯数字1-5位，或以.HK结尾
+  const hkMatch = code.match(/^(\d{1,5})(\.HK)?$/i);
+  if (hkMatch) {
+    const hkCode = hkMatch[1].padStart(5, '0');
+    const secid = `116.${hkCode}`;
+    const url = `https://push2.eastmoney.com/api/qt/stock/get?fltt=2&fields=f43,f57,f58&secid=${secid}`;
+    const res = await fetch(url, { headers: { 'Referer': 'https://quote.eastmoney.com/' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.data?.f58) return { code: hkCode, name: data.data.f58, market: 'HK' };
+    return null;
+  }
+
+  return null;
 }
 
 // ── Export / Import ──
