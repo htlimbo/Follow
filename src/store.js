@@ -163,55 +163,59 @@ export async function deleteEntry(id) {
   if (error) throw error;
 }
 
-// ── Price refresh ──
+// ── Price refresh (腾讯财经 API，CORS 开放，稳定性好) ──
+
+function buildQtSymbols(stocks) {
+  // A股：s_sh600519（沪）/ s_sz300750（深）；港股：r_hk00700
+  return stocks.map(s => {
+    if (/^\d{5}$/.test(s.code)) return `r_hk${s.code}`;
+    if (/^\d{6}$/.test(s.code)) return s.code.startsWith('6') ? `s_sh${s.code}` : `s_sz${s.code}`;
+    return null;
+  }).filter(Boolean);
+}
+
+function parseQtResponse(text) {
+  // 解析腾讯财经返回的文本，每行格式: v_xxx="field0~field1~..."
+  const prices = {};
+  const lines = text.split('\n').filter(l => l.includes('='));
+  for (const line of lines) {
+    const match = line.match(/v_\w+="(.+)"/);
+    if (!match) continue;
+    const fields = match[1].split('~');
+    // A股 s_格式: [0]市场, [1]名称, [2]代码, [3]现价, [4]涨跌额, [5]涨跌幅%
+    // 港股 r_格式: [0]市场, [1]名称, [2]代码, [3]现价, ...
+    const name = fields[1];
+    const code = fields[2];
+    const price = parseFloat(fields[3]);
+    if (name && code && !isNaN(price) && price > 0) {
+      const change = parseFloat(fields[5]) || parseFloat(fields[32]) || 0; // [5] for A, [32] for HK changePct
+      prices[code] = { price, change, name };
+    }
+  }
+  return prices;
+}
 
 export async function refreshPrices(stocks) {
-  const prices = {};
-
-  // A股：6位纯数字，批量查询
   const aStocks = stocks.filter(s => /^\d{6}$/.test(s.code));
-  if (aStocks.length > 0) {
-    const secids = aStocks
-      .map(s => (s.code.startsWith('6') ? `1.${s.code}` : `0.${s.code}`))
-      .join(',');
-    const url = `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f2,f3,f12,f14&secids=${secids}`;
-    try {
-      const res = await fetch(url, { headers: { 'Referer': 'https://quote.eastmoney.com/' } });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.data?.diff) {
-          for (const item of data.data.diff) {
-            if (item.f2 !== '-') {
-              prices[item.f12] = { price: item.f2, change: item.f3, name: item.f14 };
-            }
-          }
-        }
-      }
-    } catch { /* A股行情失败不阻断 */ }
-  }
-
-  // 港股：5位数字代码，逐只查询（qt/stock/get 不支持批量）
   const hkStocks = stocks.filter(s => /^\d{5}$/.test(s.code));
-  if (hkStocks.length > 0) {
-    const hkPromises = hkStocks.map(async (s) => {
-      try {
-        const secid = `116.${s.code}`;
-        const url = `https://push2.eastmoney.com/api/qt/stock/get?fltt=2&fields=f43,f57,f58,f169&secid=${secid}`;
-        const res = await fetch(url, { headers: { 'Referer': 'https://quote.eastmoney.com/' } });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.data?.f43 != null) {
-          prices[s.code] = { price: data.data.f43, change: data.data.f169, name: data.data.f58 };
-        }
-      } catch { /* 单只港股失败不影响其他 */ }
-    });
-    await Promise.all(hkPromises);
-  }
+  const allQuotable = [...aStocks, ...hkStocks];
+  if (allQuotable.length === 0) return {};
+
+  const symbols = buildQtSymbols(allQuotable);
+  const url = `https://qt.gtimg.cn/q=${symbols.join(',')}`;
+
+  let prices = {};
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    const buf = await res.arrayBuffer();
+    const text = new TextDecoder('gbk').decode(buf);
+    prices = parseQtResponse(text);
+  } catch { return {}; }
 
   // 批量更新数据库中的现价
-  const allStocks = [...aStocks, ...hkStocks];
   const updates = [];
-  for (const stock of allStocks) {
+  for (const stock of allQuotable) {
     const quote = prices[stock.code];
     if (quote && quote.price != null) {
       const newPrice = String(quote.price);
@@ -225,43 +229,50 @@ export async function refreshPrices(stocks) {
       }
     }
   }
-  if (updates.length > 0) {
-    await Promise.all(updates);
-  }
+  if (updates.length > 0) await Promise.all(updates);
 
   return prices;
 }
 
-// ── Stock search / validate ──
+// ── Stock search / validate (腾讯财经 API) ──
 
 export async function searchStock(code) {
   code = code.trim();
   if (!code) return null;
 
+  let symbol = null;
+  let market = null;
+
   // A股：6位纯数字
   if (/^\d{6}$/.test(code)) {
-    const secid = code.startsWith('6') ? `1.${code}` : `0.${code}`;
-    const url = `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f2,f12,f14&secids=${secid}`;
-    const res = await fetch(url, { headers: { 'Referer': 'https://quote.eastmoney.com/' } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const item = data.data?.diff?.[0];
-    if (item && item.f14) return { code: item.f12, name: item.f14, market: 'A' };
-    return null;
+    symbol = code.startsWith('6') ? `s_sh${code}` : `s_sz${code}`;
+    market = 'A';
   }
 
   // 港股：纯数字1-5位，或以.HK结尾
-  const hkMatch = code.match(/^(\d{1,5})(\.HK)?$/i);
-  if (hkMatch) {
-    const hkCode = hkMatch[1].padStart(5, '0');
-    const secid = `116.${hkCode}`;
-    const url = `https://push2.eastmoney.com/api/qt/stock/get?fltt=2&fields=f43,f57,f58&secid=${secid}`;
-    const res = await fetch(url, { headers: { 'Referer': 'https://quote.eastmoney.com/' } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.data?.f58) return { code: hkCode, name: data.data.f58, market: 'HK' };
-    return null;
+  if (!symbol) {
+    const hkMatch = code.match(/^(\d{1,5})(\.HK)?$/i);
+    if (hkMatch) {
+      const hkCode = hkMatch[1].padStart(5, '0');
+      symbol = `r_hk${hkCode}`;
+      market = 'HK';
+    }
   }
+
+  if (!symbol) return null;
+
+  try {
+    const res = await fetch(`https://qt.gtimg.cn/q=${symbol}`);
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const text = new TextDecoder('gbk').decode(buf);
+    const prices = parseQtResponse(text);
+    const keys = Object.keys(prices);
+    if (keys.length > 0) {
+      const item = prices[keys[0]];
+      return { code: keys[0], name: item.name, market };
+    }
+  } catch { /* ignore */ }
 
   return null;
 }

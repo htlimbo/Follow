@@ -532,7 +532,7 @@ export default function StockDetail() {
       </div>
 
       {/* Desktop: left-right layout; Mobile: stacked */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6">
         {/* Left: Research + Anchors */}
         <div>
           <ResearchCard stock={stock} onSave={handleSaveResearch} />

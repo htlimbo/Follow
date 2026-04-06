@@ -27,7 +27,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 bg-bg/80 backdrop-blur-sm border-b border-border">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 text-text no-underline">
             <TrendingUp size={20} className="text-accent" />
             <span className="font-semibold text-base tracking-tight">Follow</span>
@@ -54,7 +54,7 @@ export default function Layout() {
           </div>
         </div>
       </header>
-      <main className="max-w-3xl mx-auto px-4 py-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <Outlet />
       </main>
     </div>

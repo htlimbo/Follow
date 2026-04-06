@@ -32,7 +32,10 @@ function AddStockModal({ onClose, onAdd }) {
       try {
         const result = await searchStock(trimmed);
         setSearchResult(result || 'not_found');
-        if (result && !name.trim()) setName(result.name);
+        if (result) {
+          setCode(result.code);
+          if (!name.trim()) setName(result.name);
+        }
       } catch { setSearchResult('not_found'); }
       finally { setSearching(false); }
     }, 500);
@@ -418,7 +421,7 @@ export default function Portfolio() {
       </div>
 
       {/* Desktop: left-right layout; Mobile: stacked */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
         {/* Left: Stock list */}
         <div>
           {filtered.length === 0 ? (
