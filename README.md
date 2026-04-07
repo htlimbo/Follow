@@ -1,16 +1,59 @@
-# React + Vite
+# Follow — 投资思考记录与复盘工具
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> 记录你的投资思考，而不只是交易记录。
 
-Currently, two official plugins are available:
+Follow 是一个面向个人投资者的研究与持仓管理工具。核心理念是**沉淀投资过程中的判断与思考**——不是又一个盯盘软件，而是帮你回答"当时我在想什么"这个问题。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 为什么做这个？
 
-## React Compiler
+市面上不缺行情工具和交易记录软件，但很少有工具专注于投资过程中的**思考沉淀**。好的投资决策依赖持续的认知迭代，而大多数人的思考散落在微信、备忘录、Excel 里，很难在事后复盘时还原。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Follow 把每一只股票的研究逻辑、关键追踪指标、每一次判断和修正都结构化地记录下来，让你在回头看时能清晰地还原决策链路。
 
-## Expanding the ESLint configuration
+## 核心功能
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 组合总览
+- 持仓/观察/已清仓三种状态管理
+- A 股 + 港股实时行情自动刷新
+- 总市值、总盈亏、持仓分布饼图、个股盈亏图表
+- 数据导入导出（JSON 备份）
+
+### 个股研究卡片
+- **研究摘要**：投资逻辑、看好理由、风险点、成本价、现价、持仓数量、盈亏计算
+- **关键追踪锚**：替代传统止盈止损。每个锚 = 指标名称 + 预期值 + 追踪频率 + 最新实际值。比如"季度出货量 > 50 万台"、"毛利率 > 25%"
+- **思考时间线**：按时间排列的判断记录，支持思考、买入、卖出、修正判断、纪律执行五种类型标签
+
+### 行情数据
+- A 股 + 港股实时价格（腾讯财经 API）
+- 添加股票时输入代码自动识别名称
+- 页面加载自动刷新 + 手动刷新
+
+## 技术栈
+
+- **前端**: React + Vite + Tailwind CSS v4
+- **后端**: Supabase（PostgreSQL + Auth + Row Level Security）
+- **图表**: Recharts
+- **部署**: Vercel
+
+## 本地开发
+
+```bash
+# 安装依赖
+npm install
+
+# 配置环境变量（复制 .env.example 并填入 Supabase 信息）
+cp .env.example .env
+
+# 启动开发服务器
+npm run dev
+```
+
+需要在 `.env` 中配置：
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+## License
+
+MIT

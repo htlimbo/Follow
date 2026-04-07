@@ -531,27 +531,27 @@ export default function StockDetail() {
         </button>
       </div>
 
-      {/* Desktop: left-right layout; Mobile: stacked */}
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6">
-        {/* Left: Research + Anchors */}
-        <div>
-          <ResearchCard stock={stock} onSave={handleSaveResearch} />
-          <AnchorsCard stockId={id} />
-        </div>
-
-        {/* Right: Timeline */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
-            {!showAddEntry && (
-              <button onClick={() => setShowAddEntry(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-accent hover:bg-accent-light transition-colors">
-                <Plus size={14} /> 记录想法
-              </button>
-            )}
+      {/* Has entries: left-right layout on desktop; No entries: single column */}
+      {entries.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6">
+          {/* Left: Research + Anchors */}
+          <div>
+            <ResearchCard stock={stock} onSave={handleSaveResearch} />
+            <AnchorsCard stockId={id} />
           </div>
 
-          {entries.length > 0 && (
+          {/* Right: Timeline */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
+              {!showAddEntry && (
+                <button onClick={() => setShowAddEntry(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-accent hover:bg-accent-light transition-colors">
+                  <Plus size={14} /> 记录想法
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center gap-1 mb-4 flex-wrap">
               <button onClick={() => setEntryFilter('all')}
                 className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
@@ -573,25 +573,42 @@ export default function StockDetail() {
                 );
               })}
             </div>
-          )}
 
-          {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} />}
+            {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} />}
 
-          {entries.length === 0 ? (
-            <div className="text-center py-12">
-              <Brain size={32} className="text-text-tertiary mx-auto mb-3" />
-              <p className="text-sm text-text-secondary mb-1">还没有思考记录</p>
-              <p className="text-xs text-text-tertiary">记录每一次判断和操作背后的想法</p>
-            </div>
-          ) : (
             <div className="mt-2">
               {(entryFilter === 'all' ? entries : entries.filter(e => e.type === entryFilter)).map(entry => (
                 <TimelineEntry key={entry.id} entry={entry} onDelete={handleDeleteEntry} />
               ))}
             </div>
+          </div>
+        </div>
+      ) : (
+        /* No entries: single column layout */
+        <div>
+          <ResearchCard stock={stock} onSave={handleSaveResearch} />
+          <AnchorsCard stockId={id} />
+
+          {/* Timeline empty state + add entry */}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
+          </div>
+
+          {showAddEntry ? (
+            <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} />
+          ) : (
+            <div className="bg-surface rounded-xl border border-border-light p-8 text-center">
+              <Brain size={36} className="text-text-tertiary mx-auto mb-3" />
+              <p className="text-sm text-text-secondary mb-1">还没有思考记录</p>
+              <p className="text-xs text-text-tertiary mb-4">记录每一次判断和操作背后的想法，这是投资复盘最有价值的部分</p>
+              <button onClick={() => setShowAddEntry(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors">
+                <Plus size={14} /> 写下第一条想法
+              </button>
+            </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* Delete confirmation */}
       {showDeleteConfirm && (

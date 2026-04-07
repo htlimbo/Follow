@@ -350,23 +350,24 @@ export default function Portfolio() {
     );
   }
 
-  // Chart data: holding distribution (pie) & per-stock P&L (bar)
+  // Chart data
   const pieData = [];
-  const barData = [];
+  const pnlAmountData = [];
+  const pnlPctData = [];
   holdingStocks.forEach(s => {
     const current = parseFloat(s.currentPrice);
     const shares = parseFloat(s.shares);
     const cost = parseFloat(s.costPrice);
     if (!isNaN(current) && !isNaN(shares) && shares > 0) {
-      const mv = current * shares;
-      pieData.push({ name: s.name, value: Math.round(mv) });
+      pieData.push({ name: s.name, value: Math.round(current * shares) });
     }
     if (!isNaN(cost) && !isNaN(current) && !isNaN(shares) && cost !== 0 && shares > 0) {
-      const pnl = (current - cost) * shares;
-      barData.push({ name: s.name, pnl: Math.round(pnl) });
+      pnlAmountData.push({ name: s.name, pnl: Math.round((current - cost) * shares) });
+      pnlPctData.push({ name: s.name, pct: +((current - cost) / Math.abs(cost) * 100).toFixed(2) });
     }
   });
-  barData.sort((a, b) => b.pnl - a.pnl);
+  pnlAmountData.sort((a, b) => b.pnl - a.pnl);
+  pnlPctData.sort((a, b) => b.pct - a.pct);
 
   return (
     <div>
@@ -460,9 +461,9 @@ export default function Portfolio() {
           )}
         </div>
 
-        {/* Right: Stats + Charts (only when there are holding stocks with data) */}
+        {/* Right: Stats + Charts — sticky so it follows scroll */}
         {holdingStocks.length > 0 && (
-          <div className="flex flex-col gap-4">
+          <div className="lg:sticky lg:top-20 lg:self-start flex flex-col gap-4">
             {/* Stats cards */}
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-surface rounded-xl border border-border p-2.5">
@@ -518,18 +519,37 @@ export default function Portfolio() {
               </div>
             )}
 
-            {/* Bar chart: per-stock P&L */}
-            {barData.length > 0 && (
+            {/* Bar chart: per-stock P&L amount */}
+            {pnlAmountData.length > 0 && (
               <div className="bg-surface rounded-xl border border-border p-4">
-                <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">个股盈亏</h3>
-                <ResponsiveContainer width="100%" height={Math.max(150, barData.length * 36)}>
-                  <BarChart data={barData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
+                <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">个股盈亏金额</h3>
+                <ResponsiveContainer width="100%" height={Math.max(120, pnlAmountData.length * 32)}>
+                  <BarChart data={pnlAmountData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
                     <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => formatMoney(v)} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={64} />
-                    <Tooltip formatter={(v) => formatMoney(v)} />
+                    <Tooltip formatter={(v) => formatMoney(v)} labelStyle={{ fontSize: 12 }} />
                     <Bar dataKey="pnl" radius={[0, 4, 4, 0]}>
-                      {barData.map((d, i) => (
+                      {pnlAmountData.map((d, i) => (
                         <Cell key={i} fill={d.pnl >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Bar chart: per-stock P&L percentage */}
+            {pnlPctData.length > 0 && (
+              <div className="bg-surface rounded-xl border border-border p-4">
+                <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">个股收益率</h3>
+                <ResponsiveContainer width="100%" height={Math.max(120, pnlPctData.length * 32)}>
+                  <BarChart data={pnlPctData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
+                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={64} />
+                    <Tooltip formatter={(v) => `${v}%`} labelStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="pct" radius={[0, 4, 4, 0]}>
+                      {pnlPctData.map((d, i) => (
+                        <Cell key={i} fill={d.pct >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'} />
                       ))}
                     </Bar>
                   </BarChart>
