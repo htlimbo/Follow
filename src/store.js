@@ -277,6 +277,118 @@ export async function searchStock(code) {
   return null;
 }
 
+// ── Review operations ──
+
+export async function getReviewableEntries(startDate, endDate) {
+  const { data, error } = await supabase
+    .from('entries')
+    .select('*, stocks!inner(name, code, current_price, cost_price)')
+    .in('type', ['buy', 'sell', 'adjust'])
+    .gte('created_at', startDate)
+    .lte('created_at', endDate + 'T23:59:59')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    ...mapEntry(row),
+    stockName: row.stocks?.name || '',
+    stockCode: row.stocks?.code || '',
+    stockCurrentPrice: row.stocks?.current_price || '',
+    stockCostPrice: row.stocks?.cost_price || '',
+  }));
+}
+
+export async function updateEntryVerdict(entryId, verdict) {
+  const { data, error } = await supabase
+    .from('entries')
+    .update({ review_verdict: verdict })
+    .eq('id', entryId)
+    .select()
+    .single();
+  if (error) throw error;
+  return mapEntry(data);
+}
+
+export async function getEntriesInRange(startDate, endDate) {
+  const { data, error } = await supabase
+    .from('entries')
+    .select('*')
+    .gte('created_at', startDate)
+    .lte('created_at', endDate + 'T23:59:59')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(mapEntry);
+}
+
+export async function getAllAnchors() {
+  const { data, error } = await supabase
+    .from('anchors')
+    .select('*, stocks!inner(name)')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    ...mapAnchor(row),
+    stockName: row.stocks?.name || '',
+  }));
+}
+
+// ── Review notes CRUD ──
+
+export async function getReviews() {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*')
+    .order('period_start', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(mapReview);
+}
+
+export async function getReviewByPeriod(periodStart, periodEnd) {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('period_start', periodStart)
+    .eq('period_end', periodEnd)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapReview(data) : null;
+}
+
+export async function saveReview({ id, periodStart, periodEnd, summary }) {
+  if (id) {
+    const { data, error } = await supabase
+      .from('reviews')
+      .update({ summary, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapReview(data);
+  }
+  const { data, error } = await supabase
+    .from('reviews')
+    .insert({ period_start: periodStart, period_end: periodEnd, summary })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapReview(data);
+}
+
+export async function deleteReview(id) {
+  const { error } = await supabase.from('reviews').delete().eq('id', id);
+  if (error) throw error;
+}
+
+function mapReview(row) {
+  return {
+    id: row.id,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    summary: row.summary || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 // ── Export / Import ──
 
 export async function exportData() {
@@ -401,6 +513,7 @@ function mapEntry(row) {
     type: row.type,
     content: row.content,
     price: row.price || '',
+    reviewVerdict: row.review_verdict || null,
     createdAt: row.created_at,
   };
 }

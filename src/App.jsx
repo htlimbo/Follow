@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import AuthGuard from './components/AuthGuard';
 import Portfolio from './pages/Portfolio';
 import StockDetail from './pages/StockDetail';
+import Review from './pages/Review';
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Portfolio />} />
             <Route path="/stock/:id" element={<StockDetail />} />
+            <Route path="/review" element={<Review />} />
           </Route>
         </Routes>
       </AuthGuard>

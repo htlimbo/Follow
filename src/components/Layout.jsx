@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link } from 'react-router-dom';
-import { TrendingUp, LogOut } from 'lucide-react';
+import { TrendingUp, LogOut, ClipboardCheck } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 const MARKET_KEY = 'follow_market_mode';
@@ -33,6 +33,9 @@ export default function Layout() {
             <span className="font-semibold text-base tracking-tight">Follow</span>
           </Link>
           <div className="flex items-center gap-2.5">
+            <Link to="/review" className="text-text-tertiary hover:text-text p-2 rounded-lg hover:bg-surface-hover transition-colors" title="复盘">
+              <ClipboardCheck size={16} />
+            </Link>
             <button
               onClick={toggleMarket}
               className="relative w-10 h-[22px] rounded-full transition-colors duration-200 focus:outline-none"
