@@ -6,6 +6,14 @@ import AddStockModal from '../components/AddStockModal';
 import StockCard from '../components/StockCard';
 import PortfolioCharts from '../components/PortfolioCharts';
 
+function isTradingHour() {
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 0 || day === 6) return false;
+  const time = now.getHours() * 60 + now.getMinutes();
+  return time >= 555 && time <= 905; // 9:15 - 15:05
+}
+
 export default function Portfolio() {
   const [stocks, setStocks] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -23,19 +31,21 @@ export default function Portfolio() {
         setStocks(s);
         setEntries(e);
 
-        // 自动刷新A股现价
-        try {
-          const prices = await refreshPrices(s);
-          if (Object.keys(prices).length > 0) {
-            setStocks(prev => prev.map(stock => {
-              const quote = prices[stock.code];
-              if (quote && quote.price != null) {
-                return { ...stock, currentPrice: String(quote.price) };
-              }
-              return stock;
-            }));
-          }
-        } catch { /* 行情刷新失败不影响页面加载 */ }
+        // 交易时间内自动刷新现价（周一至周五 9:15-15:05）
+        if (isTradingHour() && s.length > 0) {
+          try {
+            const prices = await refreshPrices(s);
+            if (Object.keys(prices).length > 0) {
+              setStocks(prev => prev.map(stock => {
+                const quote = prices[stock.code];
+                if (quote && quote.price != null) {
+                  return { ...stock, currentPrice: String(quote.price) };
+                }
+                return stock;
+              }));
+            }
+          } catch { /* 行情刷新失败不影响页面加载 */ }
+        }
       } catch (err) {
         console.error('Failed to load data:', err);
       } finally {

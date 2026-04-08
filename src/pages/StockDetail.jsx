@@ -65,6 +65,11 @@ export default function StockDetail() {
     setStock(updated);
   }
 
+  async function handleClosePosition({ content, price }) {
+    const entry = await addEntry({ stockId: id, type: 'sell', content, price });
+    setEntries(prev => [entry, ...prev]);
+  }
+
   async function handleAddEntry(data) {
     const entry = await addEntry({ stockId: id, ...data });
     setEntries(prev => [entry, ...prev]);
@@ -105,7 +110,7 @@ export default function StockDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6">
           {/* Left: Research + Anchors */}
           <div>
-            <ResearchCard stock={stock} onSave={handleSaveResearch} />
+            <ResearchCard stock={stock} onSave={handleSaveResearch} onClose={handleClosePosition} />
             <AnchorsCard stockId={id} />
           </div>
 
@@ -154,7 +159,7 @@ export default function StockDetail() {
       ) : (
         /* No entries: single column layout */
         <div>
-          <ResearchCard stock={stock} onSave={handleSaveResearch} />
+          <ResearchCard stock={stock} onSave={handleSaveResearch} onClose={handleClosePosition} />
           <AnchorsCard stockId={id} />
 
           {/* Timeline empty state + add entry */}

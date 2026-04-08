@@ -8,7 +8,7 @@ const STATUS_OPTIONS = [
   { key: 'closed', label: '已清仓' },
 ];
 
-export default function ResearchCard({ stock, onSave }) {
+export default function ResearchCard({ stock, onSave, onClose }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     thesis: stock.thesis || '',
@@ -22,6 +22,20 @@ export default function ResearchCard({ stock, onSave }) {
   const [expanded, setExpanded] = useState(true);
 
   async function handleSave() {
+    // 检测从持仓变为已清仓，自动生成盈亏快照
+    if (form.status === 'closed' && stock.status === 'holding' && onClose) {
+      const cost = parseFloat(stock.costPrice);
+      const current = parseFloat(stock.currentPrice);
+      const shares = parseFloat(stock.shares);
+      if (!isNaN(cost) && !isNaN(current) && !isNaN(shares) && cost !== 0 && shares > 0) {
+        const pnl = (current - cost) * shares;
+        const pnlPct = ((current - cost) / Math.abs(cost) * 100).toFixed(2);
+        onClose({
+          content: `清仓总结：成本价 ${cost}，清仓价 ${current}，持仓 ${shares} 股，盈亏 ${pnl >= 0 ? '+' : ''}${formatMoney(pnl)}（${pnlPct}%）`,
+          price: String(current),
+        });
+      }
+    }
     await onSave(form);
     setEditing(false);
   }
