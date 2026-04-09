@@ -1,25 +1,8 @@
-import { useState, useEffect } from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { TrendingUp, LogOut, ClipboardCheck } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
-const MARKET_KEY = 'follow_market_mode';
-
 export default function Layout() {
-  const [isCN, setIsCN] = useState(() => {
-    return localStorage.getItem(MARKET_KEY) !== 'us';
-  });
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('cn-market', isCN);
-  }, [isCN]);
-
-  function toggleMarket() {
-    const next = !isCN;
-    setIsCN(next);
-    localStorage.setItem(MARKET_KEY, next ? 'cn' : 'us');
-  }
-
   async function handleLogout() {
     await supabase.auth.signOut();
   }
@@ -36,17 +19,6 @@ export default function Layout() {
             <Link to="/review" className="text-text-tertiary hover:text-text p-2 rounded-lg hover:bg-surface-hover transition-colors" title="复盘">
               <ClipboardCheck size={16} />
             </Link>
-            <button
-              onClick={toggleMarket}
-              className="relative w-10 h-[22px] rounded-full transition-colors duration-200 focus:outline-none"
-              style={{ backgroundColor: isCN ? '#dc2626' : '#16a34a' }}
-              title={isCN ? '点击切换美股' : '点击切换A股'}
-            >
-              <span
-                className="absolute top-[3px] left-[3px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200"
-                style={{ transform: isCN ? 'translateX(0)' : 'translateX(18px)' }}
-              />
-            </button>
             <button
               onClick={handleLogout}
               className="text-text-tertiary hover:text-text p-2 rounded-lg hover:bg-surface-hover transition-colors"
