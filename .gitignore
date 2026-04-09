@@ -20,6 +20,9 @@ dist-ssr
 # Claude Code
 CLAUDE.md
 
+# Tauri build artifacts
+src-tauri/target/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
