@@ -40,6 +40,14 @@ export function formatDate(iso) {
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 }
 
+export function isTradingHour() {
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 0 || day === 6) return false;
+  const time = now.getHours() * 60 + now.getMinutes();
+  return time >= 555 && time <= 905; // 9:15 - 15:05
+}
+
 // Shared constants
 
 export const STATUS_CONFIG = {

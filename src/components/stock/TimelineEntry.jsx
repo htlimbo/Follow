@@ -1,5 +1,5 @@
 import { Trash2, Brain, ShoppingCart, LogOut, RefreshCw, Shield } from 'lucide-react';
-import { ENTRY_TYPES, formatDate } from '../utils';
+import { ENTRY_TYPES, formatDate } from '../../utils';
 
 const ENTRY_ICONS = {
   thought: Brain,

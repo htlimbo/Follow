@@ -7,10 +7,10 @@ import {
   refreshPrices,
 } from '../store';
 import { ENTRY_TYPES } from '../utils';
-import ResearchCard from '../components/ResearchCard';
-import AnchorsCard from '../components/AnchorsCard';
-import AddEntryForm from '../components/AddEntryForm';
-import TimelineEntry from '../components/TimelineEntry';
+import ResearchCard from '../components/stock/ResearchCard';
+import AnchorsCard from '../components/stock/AnchorsCard';
+import AddEntryForm from '../components/stock/AddEntryForm';
+import TimelineEntry from '../components/stock/TimelineEntry';
 
 export default function StockDetail() {
   const { id } = useParams();

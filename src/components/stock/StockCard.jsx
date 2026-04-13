@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight, Briefcase, Eye, Archive } from 'lucide-react';
-import { formatPnl, formatMoney, formatTime, STATUS_CONFIG } from '../utils';
+import { formatPnl, formatMoney, formatTime, STATUS_CONFIG } from '../../utils';
 
 const STATUS_ICONS = { holding: Briefcase, watching: Eye, closed: Archive };
 

@@ -1,9 +1,7 @@
 import { useState, useRef } from 'react';
-import { X, Briefcase, Eye, Archive } from 'lucide-react';
-import { searchStock } from '../store';
-import { STATUS_CONFIG } from '../utils';
-
-const STATUS_ICONS = { holding: Briefcase, watching: Eye, closed: Archive };
+import { X } from 'lucide-react';
+import { searchStock } from '../../store';
+import { STATUS_CONFIG } from '../../utils';
 
 export default function AddStockModal({ onClose, onAdd }) {
   const [name, setName] = useState('');
@@ -16,27 +14,35 @@ export default function AddStockModal({ onClose, onAdd }) {
   function handleCodeChange(val) {
     setCode(val);
     setSearchResult(null);
+    setName('');
     if (searchTimer.current) clearTimeout(searchTimer.current);
     const trimmed = val.trim();
     if (!trimmed) return;
+    // 只对完整代码触发搜索：6位A股 或 5位港股
+    const is6 = /^\d{6}$/.test(trimmed);
+    const is5 = /^\d{5}$/.test(trimmed);
+    if (!is6 && !is5) return;
+    // 5位时延迟更长，给用户继续输入第6位的机会
+    const delay = is5 ? 1000 : 300;
     searchTimer.current = setTimeout(async () => {
       setSearching(true);
       try {
         const result = await searchStock(trimmed);
         setSearchResult(result || 'not_found');
         if (result) {
-          setCode(result.code);
-          if (!name.trim()) setName(result.name);
+          setName(result.name);
         }
       } catch { setSearchResult('not_found'); }
       finally { setSearching(false); }
-    }, 500);
+    }, delay);
   }
+
+  const isValid = searchResult && searchResult !== 'not_found';
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!name.trim()) return;
-    onAdd({ name: name.trim(), code: code.trim(), status });
+    if (!isValid) return;
+    onAdd({ name: searchResult.name, code: searchResult.code, status });
     onClose();
   }
 
@@ -64,8 +70,8 @@ export default function AddStockModal({ onClose, onAdd }) {
           </div>
           <div>
             <label className="block text-sm text-text-secondary mb-1.5">股票名称</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="输入代码后自动填充"
-              className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent transition-colors" />
+            <input type="text" value={name} readOnly placeholder="输入代码后自动填充"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-surface-hover text-sm text-text-secondary cursor-not-allowed" />
           </div>
           <div>
             <label className="block text-sm text-text-secondary mb-1.5">状态</label>
@@ -80,7 +86,7 @@ export default function AddStockModal({ onClose, onAdd }) {
               ))}
             </div>
           </div>
-          <button type="submit" disabled={!name.trim()}
+          <button type="submit" disabled={!isValid}
             className="mt-1 w-full py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             添加
           </button>

@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
-import AuthGuard from './components/AuthGuard';
+import Layout from './components/layout/Layout';
+import AuthGuard from './components/layout/AuthGuard';
 import Portfolio from './pages/Portfolio';
 import StockDetail from './pages/StockDetail';
 import Review from './pages/Review';

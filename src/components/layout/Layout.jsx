@@ -1,8 +1,8 @@
 import { Outlet, Link } from 'react-router-dom';
 import { TrendingUp, LogOut, ClipboardCheck, Settings, HardDrive, Cloud } from 'lucide-react';
 import { useState } from 'react';
-import { supabase } from '../supabaseClient';
-import { isTauri, getStorageMode, setStorageMode } from '../store';
+import { supabase } from '../../supabaseClient';
+import { isTauri, getStorageMode, setStorageMode } from '../../store';
 
 export default function Layout() {
   const [showSettings, setShowSettings] = useState(false);

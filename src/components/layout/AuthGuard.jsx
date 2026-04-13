@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
-import Login from '../pages/Login';
+import { supabase } from '../../supabaseClient';
+import Login from '../../pages/Login';
 
 export default function AuthGuard({ children }) {
   const [session, setSession] = useState(undefined); // undefined = loading

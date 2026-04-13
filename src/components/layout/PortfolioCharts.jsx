@@ -1,5 +1,5 @@
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatMoney, formatPnl, CHART_COLORS } from '../utils';
+import { formatMoney, formatPnl, CHART_COLORS } from '../../utils';
 
 export default function PortfolioCharts({ holdingStocks }) {
   // Calculate summary stats

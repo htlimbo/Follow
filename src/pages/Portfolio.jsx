@@ -1,18 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, TrendingUp, ArrowUpDown, RefreshCw, Download, Upload } from 'lucide-react';
 import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices } from '../store';
+import { isTradingHour } from '../utils';
 import { seedDemo } from '../seedDemo';
-import AddStockModal from '../components/AddStockModal';
-import StockCard from '../components/StockCard';
-import PortfolioCharts from '../components/PortfolioCharts';
-
-function isTradingHour() {
-  const now = new Date();
-  const day = now.getDay();
-  if (day === 0 || day === 6) return false;
-  const time = now.getHours() * 60 + now.getMinutes();
-  return time >= 555 && time <= 905; // 9:15 - 15:05
-}
+import AddStockModal from '../components/stock/AddStockModal';
+import StockCard from '../components/stock/StockCard';
+import PortfolioCharts from '../components/layout/PortfolioCharts';
 
 export default function Portfolio() {
   const [stocks, setStocks] = useState([]);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit3, Trash2, ChevronDown, ChevronUp, Crosshair } from 'lucide-react';
-import { getAnchors, addAnchor, updateAnchor, deleteAnchor } from '../store';
+import { getAnchors, addAnchor, updateAnchor, deleteAnchor } from '../../store';
 
 const FREQ_OPTIONS = ['月度', '季度', '半年度', '年度', '不定期'];
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Edit3, Save, ChevronDown, ChevronUp } from 'lucide-react';
-import { formatMoney } from '../utils';
+import { formatMoney } from '../../utils';
 
 const STATUS_OPTIONS = [
   { key: 'holding', label: '持仓' },

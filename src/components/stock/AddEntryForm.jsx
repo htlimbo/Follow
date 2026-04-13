@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Brain, ShoppingCart, LogOut, RefreshCw, Shield } from 'lucide-react';
-import { ENTRY_TYPES } from '../utils';
+import { ENTRY_TYPES } from '../../utils';
 
 const ENTRY_ICONS = {
   thought: Brain,
