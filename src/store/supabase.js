@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { fetchQuotes, searchStock as _searchStock } from './shared.js';
 
 // ── Stock operations ──
 
@@ -163,59 +164,14 @@ export async function deleteEntry(id) {
   if (error) throw error;
 }
 
-// ── Price refresh (腾讯财经 API，CORS 开放，稳定性好) ──
-
-function buildQtSymbols(stocks) {
-  // A股：s_sh600519（沪）/ s_sz300750（深）；港股：r_hk00700
-  return stocks.map(s => {
-    if (/^\d{5}$/.test(s.code)) return `r_hk${s.code}`;
-    if (/^\d{6}$/.test(s.code)) return s.code.startsWith('6') ? `s_sh${s.code}` : `s_sz${s.code}`;
-    return null;
-  }).filter(Boolean);
-}
-
-function parseQtResponse(text) {
-  // 解析腾讯财经返回的文本，每行格式: v_xxx="field0~field1~..."
-  const prices = {};
-  const lines = text.split('\n').filter(l => l.includes('='));
-  for (const line of lines) {
-    const match = line.match(/v_\w+="(.+)"/);
-    if (!match) continue;
-    const fields = match[1].split('~');
-    // A股 s_格式: [0]市场, [1]名称, [2]代码, [3]现价, [4]涨跌额, [5]涨跌幅%
-    // 港股 r_格式: [0]市场, [1]名称, [2]代码, [3]现价, ...
-    const name = fields[1];
-    const code = fields[2];
-    const price = parseFloat(fields[3]);
-    if (name && code && !isNaN(price) && price > 0) {
-      const change = parseFloat(fields[5]) || parseFloat(fields[32]) || 0; // [5] for A, [32] for HK changePct
-      prices[code] = { price, change, name };
-    }
-  }
-  return prices;
-}
+// ── Price refresh（网络请求来自 shared.js，写库仍走 Supabase）──
 
 export async function refreshPrices(stocks) {
-  const aStocks = stocks.filter(s => /^\d{6}$/.test(s.code));
-  const hkStocks = stocks.filter(s => /^\d{5}$/.test(s.code));
-  const allQuotable = [...aStocks, ...hkStocks];
-  if (allQuotable.length === 0) return {};
-
-  const symbols = buildQtSymbols(allQuotable);
-  const url = `https://qt.gtimg.cn/q=${symbols.join(',')}`;
-
-  let prices = {};
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return {};
-    const buf = await res.arrayBuffer();
-    const text = new TextDecoder('gbk').decode(buf);
-    prices = parseQtResponse(text);
-  } catch { return {}; }
+  const prices = await fetchQuotes(stocks);
 
   // 批量更新数据库中的现价
   const updates = [];
-  for (const stock of allQuotable) {
+  for (const stock of stocks) {
     const quote = prices[stock.code];
     if (quote && quote.price != null) {
       const newPrice = String(quote.price);
@@ -234,48 +190,9 @@ export async function refreshPrices(stocks) {
   return prices;
 }
 
-// ── Stock search / validate (腾讯财经 API) ──
+// ── Stock search（直接复用 shared.js）──
 
-export async function searchStock(code) {
-  code = code.trim();
-  if (!code) return null;
-
-  let symbol = null;
-  let market = null;
-
-  // A股：6位纯数字
-  if (/^\d{6}$/.test(code)) {
-    symbol = code.startsWith('6') ? `s_sh${code}` : `s_sz${code}`;
-    market = 'A';
-  }
-
-  // 港股：纯数字1-5位，或以.HK结尾
-  if (!symbol) {
-    const hkMatch = code.match(/^(\d{1,5})(\.HK)?$/i);
-    if (hkMatch) {
-      const hkCode = hkMatch[1].padStart(5, '0');
-      symbol = `r_hk${hkCode}`;
-      market = 'HK';
-    }
-  }
-
-  if (!symbol) return null;
-
-  try {
-    const res = await fetch(`https://qt.gtimg.cn/q=${symbol}`);
-    if (!res.ok) return null;
-    const buf = await res.arrayBuffer();
-    const text = new TextDecoder('gbk').decode(buf);
-    const prices = parseQtResponse(text);
-    const keys = Object.keys(prices);
-    if (keys.length > 0) {
-      const item = prices[keys[0]];
-      return { code: keys[0], name: item.name, market };
-    }
-  } catch { /* ignore */ }
-
-  return null;
-}
+export { _searchStock as searchStock };
 
 // ── Review operations ──
 

@@ -82,4 +82,6 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ## License
 
-MIT
+AGPL-3.0 — 详见 [LICENSE](LICENSE) 文件。
+
+简单来说：你可以自由使用和修改本项目，但修改后的版本必须同样开源并保持 AGPL-3.0 协议。商业授权请联系作者。

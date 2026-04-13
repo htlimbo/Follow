@@ -1,27 +1,35 @@
-// 数据层统一入口（阶段三 P0 抽象）
+// 数据层统一入口
 //
-// 目的：所有组件只 import from '../store'，底层实现在这里切换。
-// 未来 Web 版继续走 Supabase，桌面 Pro 版走本地 SQLite。
+// 所有组件只 import from '../store'，底层实现在这里切换。
+// - Web 版：永远走 Supabase（无需选择）
+// - Tauri 桌面版：默认走 Supabase（云端同步），Pro 用户可切换到本地 SQLite
 //
-// ── 切换策略 ──
-// 阶段三 P0（当前）：sqlite.js 还是存根，所以强制走 supabase。
-//                    Tauri 包也通过 supabase 访问云端数据——与阶段一行为一致。
-// 阶段三 P1 完成后：把 USE_SQLITE 改为运行时检测：
-//     const USE_SQLITE = typeof window !== 'undefined'
-//                        && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
-//
-// 这样 Web 版构建继续用 Supabase，Tauri 构建自动走本地 SQLite。
-// 目前用 const false 是为了让 bundler 静态消除 sqlite 分支，Web 版零影响。
+// 存储模式保存在 localStorage('follow_storage_mode')：
+//   'local' = 本地 SQLite（仅 Tauri 桌面版 Pro 用户）
+//   其他或不存在 = Supabase 云端
 
 import * as supabaseImpl from './supabase.js';
 import * as sqliteImpl from './sqlite.js';
 
-const USE_SQLITE = false;
+const STORAGE_KEY = 'follow_storage_mode';
 
-const impl = USE_SQLITE ? sqliteImpl : supabaseImpl;
+export const isTauri = typeof window !== 'undefined'
+  && '__TAURI_INTERNALS__' in window;
 
-// 显式列出所有接口函数，作为数据层的"契约"。
-// 两套实现必须提供同名同签名的导出，否则这里会解构出 undefined、运行时报错。
+export function getStorageMode() {
+  if (!isTauri) return 'cloud';
+  return localStorage.getItem(STORAGE_KEY) === 'local' ? 'local' : 'cloud';
+}
+
+export function setStorageMode(mode) {
+  localStorage.setItem(STORAGE_KEY, mode);
+  // 切换后需要刷新页面，让所有组件重新绑定到新的 store 实现
+  window.location.reload();
+}
+
+const useLocal = isTauri && getStorageMode() === 'local';
+const impl = useLocal ? sqliteImpl : supabaseImpl;
+
 export const {
   // Stock
   getStocks,
