@@ -11,7 +11,7 @@
     "fs:default",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
-    "fs:allow-app-data-read",
-    "fs:allow-app-data-write"
+    "fs:allow-appdata-read",
+    "fs:allow-appdata-write"
   ]
 }

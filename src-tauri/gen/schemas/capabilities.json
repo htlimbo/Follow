@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"默认权限：允许 SQL 插件访问本地 SQLite 数据库","local":true,"windows":["main"],"permissions":["core:default","sql:default","sql:allow-execute","sql:allow-select"]}}
+{"default":{"identifier":"default","description":"默认权限：SQL + 文件系统（AppData license 文件读写）","local":true,"windows":["main"],"permissions":["core:default","sql:default","sql:allow-execute","sql:allow-select","fs:default","fs:allow-read-text-file","fs:allow-write-text-file","fs:allow-appdata-read","fs:allow-appdata-write"]}}
