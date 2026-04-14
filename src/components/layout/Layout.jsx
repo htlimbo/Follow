@@ -1,12 +1,17 @@
+import { useContext } from 'react';
 import { Outlet, Link } from 'react-router-dom';
-import { TrendingUp, LogOut, ClipboardCheck, Settings, HardDrive, Cloud } from 'lucide-react';
+import { TrendingUp, LogOut, ClipboardCheck, Settings, HardDrive, Cloud, Key } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { isTauri, getStorageMode, setStorageMode } from '../../store';
+import { LicenseContext } from '../../App';
 
 export default function Layout() {
   const [showSettings, setShowSettings] = useState(false);
   const storageMode = getStorageMode();
+  const licenseStatus = useContext(LicenseContext);
+  const isTrial = licenseStatus.status === 'trial';
+  const isLocal = storageMode === 'local';
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -22,6 +27,11 @@ export default function Layout() {
     setStorageMode(mode);
   }
 
+  function handleActivate() {
+    // 跳转到激活流程：清除 trial 标记让 App 重新检查
+    window.location.reload();
+  }
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 bg-bg/80 backdrop-blur-sm border-b border-border">
@@ -31,7 +41,12 @@ export default function Layout() {
             <span className="font-semibold text-base tracking-tight">Follow</span>
             {isTauri && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-text-tertiary font-normal">
-                {storageMode === 'local' ? '本地' : '云端'}
+                {isLocal ? '本地' : '云端'}
+              </span>
+            )}
+            {isTauri && isTrial && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-normal">
+                试用 {licenseStatus.daysLeft} 天
               </span>
             )}
           </Link>
@@ -39,6 +54,18 @@ export default function Layout() {
             <Link to="/review" className="text-text-tertiary hover:text-text p-2 rounded-lg hover:bg-surface-hover transition-colors" title="复盘">
               <ClipboardCheck size={16} />
             </Link>
+
+            {/* 试用期：显示激活入口 */}
+            {isTauri && isTrial && (
+              <button
+                onClick={handleActivate}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-accent hover:bg-accent-light transition-colors"
+                title="输入 License Key"
+              >
+                <Key size={13} /> 激活
+              </button>
+            )}
+
             {isTauri && (
               <div className="relative">
                 <button
@@ -54,33 +81,37 @@ export default function Layout() {
                     <div className="absolute right-0 top-full mt-1 z-30 w-56 bg-bg border border-border rounded-lg shadow-lg p-3">
                       <p className="text-xs text-text-tertiary mb-2">数据存储方式</p>
                       <button
-                        onClick={() => handleSwitchStorage('cloud')}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${storageMode === 'cloud' ? 'bg-accent/10 text-accent' : 'text-text hover:bg-surface-hover'}`}
-                      >
-                        <Cloud size={14} />
-                        <span>云端同步</span>
-                        {storageMode === 'cloud' && <span className="ml-auto text-xs">✓</span>}
-                      </button>
-                      <button
                         onClick={() => handleSwitchStorage('local')}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mt-1 ${storageMode === 'local' ? 'bg-accent/10 text-accent' : 'text-text hover:bg-surface-hover'}`}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${isLocal ? 'bg-accent/10 text-accent' : 'text-text hover:bg-surface-hover'}`}
                       >
                         <HardDrive size={14} />
                         <span>本地存储</span>
-                        <span className="ml-auto text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-700">Pro</span>
+                        {isLocal && <span className="ml-auto text-xs">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => handleSwitchStorage('cloud')}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mt-1 ${!isLocal ? 'bg-accent/10 text-accent' : 'text-text hover:bg-surface-hover'}`}
+                      >
+                        <Cloud size={14} />
+                        <span>云端同步</span>
+                        {!isLocal && <span className="ml-auto text-xs">✓</span>}
                       </button>
                     </div>
                   </>
                 )}
               </div>
             )}
-            <button
-              onClick={handleLogout}
-              className="text-text-tertiary hover:text-text p-2 rounded-lg hover:bg-surface-hover transition-colors"
-              title="退出登录"
-            >
-              <LogOut size={16} />
-            </button>
+
+            {/* 云端模式才显示登出按钮 */}
+            {(!isTauri || !isLocal) && (
+              <button
+                onClick={handleLogout}
+                className="text-text-tertiary hover:text-text p-2 rounded-lg hover:bg-surface-hover transition-colors"
+                title="退出登录"
+              >
+                <LogOut size={16} />
+              </button>
+            )}
           </div>
         </div>
       </header>

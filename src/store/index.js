@@ -18,7 +18,10 @@ export const isTauri = typeof window !== 'undefined'
 
 export function getStorageMode() {
   if (!isTauri) return 'cloud';
-  return localStorage.getItem(STORAGE_KEY) === 'local' ? 'local' : 'cloud';
+  // 桌面版默认本地存储，用户可切换到云端
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored === 'cloud') return 'cloud';
+  return 'local';
 }
 
 export function setStorageMode(mode) {
