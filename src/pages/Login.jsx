@@ -162,7 +162,7 @@ export default function Login() {
         <span className="mx-2">·</span>
         <span>A 股 + 港股实时行情</span>
         <span className="mx-2">·</span>
-        <span>MIT License</span>
+        <span>AGPL-3.0 License</span>
       </footer>
     </div>
   );
