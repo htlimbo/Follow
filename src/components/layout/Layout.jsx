@@ -12,6 +12,7 @@ export default function Layout() {
   const licenseStatus = useContext(LicenseContext);
   const isTrial = licenseStatus.status === 'trial';
   const isLocal = storageMode === 'local';
+  const [confirmSwitch, setConfirmSwitch] = useState(null); // 'local' | 'cloud' | null
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -19,17 +20,14 @@ export default function Layout() {
 
   function handleSwitchStorage(mode) {
     if (mode === storageMode) return;
-    if (mode === 'local') {
-      if (!confirm('切换到本地存储后，数据将保存在本机，不再与云端同步。\n\n已有的云端数据不会自动迁移，你可以先导出再导入。\n\n确定切换？')) return;
-    } else {
-      if (!confirm('切换到云端存储后，需要登录账号，数据将同步到云端。\n\n本地数据不会自动迁移，你可以先导出再导入。\n\n确定切换？')) return;
-    }
-    setStorageMode(mode);
+    setConfirmSwitch(mode);
   }
 
-  function handleActivate() {
-    // 跳转到激活流程：清除 trial 标记让 App 重新检查
-    window.location.reload();
+  function confirmSwitchStorage() {
+    if (confirmSwitch) {
+      setStorageMode(confirmSwitch);
+      setConfirmSwitch(null);
+    }
   }
 
   return (
@@ -58,7 +56,7 @@ export default function Layout() {
             {/* 试用期：显示激活入口 */}
             {isTauri && isTrial && (
               <button
-                onClick={handleActivate}
+                onClick={() => licenseStatus.showActivation?.()}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-accent hover:bg-accent-light transition-colors"
                 title="输入 License Key"
               >
@@ -77,7 +75,7 @@ export default function Layout() {
                 </button>
                 {showSettings && (
                   <>
-                    <div className="fixed inset-0 z-20" onClick={() => setShowSettings(false)} />
+                    <div className="fixed inset-0 z-20" onClick={() => { setShowSettings(false); setConfirmSwitch(null); }} />
                     <div className="absolute right-0 top-full mt-1 z-30 w-56 bg-bg border border-border rounded-lg shadow-lg p-3">
                       <p className="text-xs text-text-tertiary mb-2">数据存储方式</p>
                       <button
@@ -96,6 +94,29 @@ export default function Layout() {
                         <span>云端同步</span>
                         {!isLocal && <span className="ml-auto text-xs">✓</span>}
                       </button>
+                      {confirmSwitch && (
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <p className="text-xs text-text-secondary mb-2">
+                            {confirmSwitch === 'local'
+                              ? '切换到本地存储后，数据将保存在本机，不再与云端同步。'
+                              : '切换到云端存储后，需要登录账号，数据将同步到云端。'}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setConfirmSwitch(null)}
+                              className="flex-1 px-2 py-1.5 rounded-md text-xs text-text-secondary hover:bg-surface-hover transition-colors"
+                            >
+                              取消
+                            </button>
+                            <button
+                              onClick={confirmSwitchStorage}
+                              className="flex-1 px-2 py-1.5 rounded-md text-xs bg-accent text-white hover:bg-accent-hover transition-colors"
+                            >
+                              确定切换
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

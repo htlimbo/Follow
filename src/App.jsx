@@ -14,6 +14,7 @@ export const LicenseContext = createContext({ status: 'licensed' });
 export default function App() {
   const [licenseStatus, setLicenseStatus] = useState(null); // null = loading
   const [licenseModule, setLicenseModule] = useState(null);
+  const [showActivation, setShowActivation] = useState(false);
 
   useEffect(() => {
     if (!isTauri) {
@@ -22,8 +23,10 @@ export default function App() {
     }
     import('./license.js').then(mod => {
       setLicenseModule(mod);
-      mod.checkLicense().then(setLicenseStatus);
-    });
+      mod.checkLicense()
+        .then(setLicenseStatus)
+        .catch(() => setLicenseStatus({ status: 'licensed' }));
+    }).catch(() => setLicenseStatus({ status: 'licensed' }));
   }, []);
 
   if (!licenseStatus) {
@@ -34,19 +37,23 @@ export default function App() {
     );
   }
 
-  // 试用到期 → 必须激活
-  if (licenseStatus.status === 'expired') {
+  // 试用到期或主动点击激活 → 显示激活页
+  if (licenseStatus.status === 'expired' || showActivation) {
     return (
       <Activation
-        onActivated={() => setLicenseStatus({ status: 'licensed' })}
+        onActivated={() => {
+          setLicenseStatus({ status: 'licensed' });
+          setShowActivation(false);
+        }}
         onActivate={key => licenseModule.activateLicense(key)}
+        onBack={licenseStatus.status !== 'expired' ? () => setShowActivation(false) : null}
       />
     );
   }
 
   // trial 或 licensed → 正常进入应用
   return (
-    <LicenseContext.Provider value={licenseStatus}>
+    <LicenseContext.Provider value={{ ...licenseStatus, showActivation: () => setShowActivation(true) }}>
       <BrowserRouter>
         <AuthGuard>
           <Routes>

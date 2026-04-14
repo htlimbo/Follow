@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { TrendingUp, Key, AlertTriangle } from 'lucide-react';
+import { TrendingUp, Key, AlertTriangle, ArrowLeft } from 'lucide-react';
 
-export default function Activation({ onActivated, onActivate }) {
+export default function Activation({ onActivated, onActivate, onBack }) {
   const [key, setKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -27,6 +27,17 @@ export default function Activation({ onActivated, onActivate }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
+        {/* Back button (only during trial, not when expired) */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1 text-sm text-text-secondary hover:text-text mb-4 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            返回
+          </button>
+        )}
+
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
           <TrendingUp size={28} className="text-accent" />

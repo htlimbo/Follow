@@ -8,7 +8,7 @@
 //
 // 数据存储在 Tauri AppData 目录（~/.follow/）
 
-import { writeTextFile, readTextFile, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { writeTextFile, readTextFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs';
 
 const LICENSE_FILE = 'license.json';
 const TRIAL_DAYS = 7;
@@ -29,12 +29,17 @@ async function readLicenseFile() {
 }
 
 /**
- * 写入本地 license 文件
+ * 写入本地 license 文件（首次写入时自动创建 AppData 目录）
  */
 async function writeLicenseFile(data) {
-  await writeTextFile(LICENSE_FILE, JSON.stringify(data, null, 2), {
-    baseDir: BaseDirectory.AppData,
-  });
+  const content = JSON.stringify(data, null, 2);
+  try {
+    await writeTextFile(LICENSE_FILE, content, { baseDir: BaseDirectory.AppData });
+  } catch {
+    // 目录不存在时先创建再重试
+    await mkdir('', { baseDir: BaseDirectory.AppData, recursive: true });
+    await writeTextFile(LICENSE_FILE, content, { baseDir: BaseDirectory.AppData });
+  }
 }
 
 /**
