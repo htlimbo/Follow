@@ -62,6 +62,9 @@ export const {
   getReviewByPeriod,
   saveReview,
   deleteReview,
+  // Portfolio settings
+  getCashBalance,
+  setCashBalance,
   // Export / Import
   exportData,
   importData,

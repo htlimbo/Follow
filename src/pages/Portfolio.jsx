@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, TrendingUp, ArrowUpDown, RefreshCw, Download, Upload } from 'lucide-react';
-import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices } from '../store';
+import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices, getCashBalance, setCashBalance } from '../store';
 import { isTradingHour } from '../utils';
 import { seedDemo } from '../seedDemo';
 import AddStockModal from '../components/stock/AddStockModal';
 import StockCard from '../components/stock/StockCard';
 import PortfolioCharts from '../components/layout/PortfolioCharts';
+import { PortfolioSkeleton } from '../components/ui/Skeleton';
 
 export default function Portfolio() {
   const [stocks, setStocks] = useState([]);
@@ -15,14 +16,18 @@ export default function Portfolio() {
   const [sortBy, setSortBy] = useState('updated'); // updated | pnl | name
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [cashBalance, setCashBal] = useState('');
+  const [editingCash, setEditingCash] = useState(false);
+  const [cashInput, setCashInput] = useState('');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [s, e] = await Promise.all([getStocks(), getAllEntries()]);
+        const [s, e, cash] = await Promise.all([getStocks(), getAllEntries(), getCashBalance()]);
         setStocks(s);
         setEntries(e);
+        setCashBal(cash);
 
         // 交易时间内自动刷新现价（周一至周五 9:15-15:05）
         if (isTradingHour() && s.length > 0) {
@@ -110,6 +115,16 @@ export default function Portfolio() {
     e.target.value = '';
   }
 
+  async function handleSaveCash() {
+    try {
+      await setCashBalance(cashInput);
+      setCashBal(cashInput);
+      setEditingCash(false);
+    } catch (err) {
+      console.error('Failed to save cash balance:', err);
+    }
+  }
+
   const latestEntryMap = {};
   const entryCountMap = {};
   entries.forEach(e => {
@@ -138,13 +153,7 @@ export default function Portfolio() {
 
   const holdingStocks = stocks.filter(s => s.status === 'holding');
 
-  if (loading) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-sm text-text-tertiary">加载中...</p>
-      </div>
-    );
-  }
+  if (loading) return <PortfolioSkeleton />;
 
   return (
     <div>
@@ -240,7 +249,39 @@ export default function Portfolio() {
 
         {/* Right: Stats + Charts */}
         {holdingStocks.length > 0 && (
-          <PortfolioCharts holdingStocks={holdingStocks} />
+          <div>
+            {/* 现金仓位编辑 */}
+            <div className="bg-surface rounded-xl border border-border p-3 mb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-text-tertiary">现金仓位</span>
+                {editingCash ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={cashInput}
+                      onChange={e => setCashInput(e.target.value)}
+                      placeholder="输入现金金额"
+                      className="w-32 px-2 py-1 rounded-lg border border-border text-sm text-right focus:outline-none focus:border-accent"
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveCash(); if (e.key === 'Escape') setEditingCash(false); }}
+                    />
+                    <button onClick={handleSaveCash} className="text-xs text-accent hover:underline">保存</button>
+                    <button onClick={() => setEditingCash(false)} className="text-xs text-text-tertiary hover:underline">取消</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setCashInput(cashBalance); setEditingCash(true); }}
+                    className="text-sm font-medium text-text hover:text-accent transition-colors"
+                  >
+                    {cashBalance && parseFloat(cashBalance) > 0
+                      ? `${parseFloat(cashBalance).toLocaleString('zh-CN')} 元`
+                      : '点击设置'}
+                  </button>
+                )}
+              </div>
+            </div>
+            <PortfolioCharts holdingStocks={holdingStocks} cashBalance={cashBalance} />
+          </div>
         )}
       </div>
 

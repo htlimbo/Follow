@@ -64,4 +64,4 @@ export const ENTRY_TYPES = {
   discipline: { label: '纪律执行', color: 'text-accent', bg: 'bg-accent-light' },
 };
 
-export const CHART_COLORS = ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#6366f1', '#0d9488'];
+export const CHART_COLORS = ['#4f46e5', '#7c3aed', '#0891b2', '#059669', '#d97706', '#f43f5e', '#6366f1', '#0d9488'];

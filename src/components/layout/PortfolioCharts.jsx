@@ -1,7 +1,19 @@
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatMoney, formatPnl, CHART_COLORS } from '../../utils';
 
-export default function PortfolioCharts({ holdingStocks }) {
+const CustomTooltip = ({ active, payload, label, formatter, suffix = '' }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-text text-white text-xs rounded-lg px-3 py-2 shadow-lg">
+      <p className="font-medium mb-0.5">{label || payload[0]?.name}</p>
+      <p>{formatter ? formatter(payload[0].value) : `${payload[0].value}${suffix}`}</p>
+    </div>
+  );
+};
+
+const CASH_COLOR = '#94a3b8'; // slate-400
+
+export default function PortfolioCharts({ holdingStocks, cashBalance = '' }) {
   // Calculate summary stats
   let totalMarketValue = 0;
   let totalCost = 0;
@@ -42,6 +54,15 @@ export default function PortfolioCharts({ holdingStocks }) {
   pnlAmountData.sort((a, b) => b.pnl - a.pnl);
   pnlPctData.sort((a, b) => b.pct - a.pct);
 
+  // 现金仓位加入饼图
+  const cashNum = parseFloat(cashBalance);
+  const hasCash = !isNaN(cashNum) && cashNum > 0;
+  if (hasCash) {
+    pieData.push({ name: '现金', value: Math.round(cashNum), isCash: true });
+  }
+
+  const pieTotal = pieData.reduce((sum, d) => sum + d.value, 0);
+
   return (
     <div className="lg:sticky lg:top-20 lg:self-start flex flex-col gap-4">
       {/* Stats cards */}
@@ -51,10 +72,13 @@ export default function PortfolioCharts({ holdingStocks }) {
           <p className="text-lg font-semibold">{holdingStocks.length}</p>
         </div>
         <div className="bg-surface rounded-xl border border-border p-2.5">
-          <p className="text-xs text-text-tertiary mb-1">总市值</p>
+          <p className="text-xs text-text-tertiary mb-1">总资产</p>
           <p className="text-lg font-semibold truncate">
-            {hasPnlData ? formatMoney(totalMarketValue) : '—'}
+            {hasPnlData || hasCash ? formatMoney(totalMarketValue + (hasCash ? cashNum : 0)) : '—'}
           </p>
+          {hasPnlData && hasCash && (
+            <p className="text-xs text-text-tertiary">持仓 {formatMoney(totalMarketValue)}</p>
+          )}
         </div>
         <div className="bg-surface rounded-xl border border-border p-2.5">
           <p className="text-xs text-text-tertiary mb-1">总盈亏</p>
@@ -81,20 +105,33 @@ export default function PortfolioCharts({ holdingStocks }) {
             <PieChart>
               <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
                 outerRadius={75} innerRadius={40} paddingAngle={2} stroke="none">
-                {pieData.map((_, i) => (
-                  <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                {pieData.map((d, i) => (
+                  <Cell key={i} fill={d.isCash ? CASH_COLOR : CHART_COLORS[i % CHART_COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v) => formatMoney(v)} />
+              <Tooltip content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const { name, value } = payload[0].payload;
+                const pct = pieTotal > 0 ? (value / pieTotal * 100).toFixed(1) : 0;
+                return (
+                  <div className="bg-text text-white text-xs rounded-lg px-3 py-2 shadow-lg">
+                    <p className="font-medium mb-0.5">{name}</p>
+                    <p>{formatMoney(value)}（{pct}%）</p>
+                  </div>
+                );
+              }} />
             </PieChart>
           </ResponsiveContainer>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-            {pieData.map((d, i) => (
-              <span key={d.name} className="flex items-center gap-1 text-xs text-text-secondary">
-                <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                {d.name}
-              </span>
-            ))}
+            {pieData.map((d, i) => {
+              const pct = pieTotal > 0 ? (d.value / pieTotal * 100).toFixed(1) : 0;
+              return (
+                <span key={d.name} className="flex items-center gap-1 text-xs text-text-secondary">
+                  <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: d.isCash ? CASH_COLOR : CHART_COLORS[i % CHART_COLORS.length] }} />
+                  {d.name} {pct}%
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
@@ -107,8 +144,8 @@ export default function PortfolioCharts({ holdingStocks }) {
             <BarChart data={pnlAmountData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
               <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => formatMoney(v)} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={64} />
-              <Tooltip formatter={(v) => formatMoney(v)} labelStyle={{ fontSize: 12 }} />
-              <Bar dataKey="pnl" radius={[0, 4, 4, 0]}>
+              <Tooltip content={<CustomTooltip formatter={formatMoney} />} />
+              <Bar dataKey="pnl" radius={[0, 6, 6, 0]}>
                 {pnlAmountData.map((d, i) => (
                   <Cell key={i} fill={d.pnl >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'} />
                 ))}
@@ -126,8 +163,8 @@ export default function PortfolioCharts({ holdingStocks }) {
             <BarChart data={pnlPctData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
               <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={64} />
-              <Tooltip formatter={(v) => `${v}%`} labelStyle={{ fontSize: 12 }} />
-              <Bar dataKey="pct" radius={[0, 4, 4, 0]}>
+              <Tooltip content={<CustomTooltip suffix="%" />} />
+              <Bar dataKey="pct" radius={[0, 6, 6, 0]}>
                 {pnlPctData.map((d, i) => (
                   <Cell key={i} fill={d.pct >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'} />
                 ))}

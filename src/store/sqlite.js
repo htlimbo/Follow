@@ -67,6 +67,14 @@ async function initTables() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS portfolio_settings (
+      id TEXT PRIMARY KEY,
+      cash_balance TEXT DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
   // 开启外键约束（SQLite 默认关闭）
   await db.execute('PRAGMA foreign_keys = ON');
 }
@@ -414,6 +422,31 @@ export async function saveReview({ id, periodStart, periodEnd, summary }) {
 export async function deleteReview(id) {
   const d = await getDb();
   await d.execute('DELETE FROM reviews WHERE id = $1', [id]);
+}
+
+// ── Portfolio settings (cash balance) ──
+
+export async function getCashBalance() {
+  const d = await getDb();
+  const rows = await d.select('SELECT cash_balance FROM portfolio_settings LIMIT 1');
+  return rows.length > 0 ? (rows[0].cash_balance || '') : '';
+}
+
+export async function setCashBalance(amount) {
+  const d = await getDb();
+  const rows = await d.select('SELECT id FROM portfolio_settings LIMIT 1');
+  const ts = now();
+  if (rows.length > 0) {
+    await d.execute(
+      'UPDATE portfolio_settings SET cash_balance = $1, updated_at = $2 WHERE id = $3',
+      [amount, ts, rows[0].id]
+    );
+  } else {
+    await d.execute(
+      'INSERT INTO portfolio_settings (id, cash_balance, created_at, updated_at) VALUES ($1, $2, $3, $4)',
+      [uuid(), amount, ts, ts]
+    );
+  }
 }
 
 // ── Export / Import ──

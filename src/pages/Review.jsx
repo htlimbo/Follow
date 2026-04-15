@@ -5,6 +5,7 @@ import { getReviewableEntries, updateEntryVerdict, getReviewByPeriod, getEntries
 import ScorecardEntry from '../components/review/ScorecardEntry';
 import DisciplineAudit from '../components/review/DisciplineAudit';
 import ReviewNote from '../components/review/ReviewNote';
+import { ReviewSkeleton } from '../components/ui/Skeleton';
 
 function getQuarterRange(offset = 0) {
   const now = new Date();
@@ -112,9 +113,7 @@ export default function Review() {
       </div>
 
       {loading ? (
-        <div className="text-center py-16">
-          <p className="text-sm text-text-tertiary">加载中...</p>
-        </div>
+        <ReviewSkeleton />
       ) : entries.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-text-secondary mb-1">这个时间段没有关键判断记录</p>

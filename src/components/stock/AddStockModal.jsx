@@ -18,12 +18,10 @@ export default function AddStockModal({ onClose, onAdd }) {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     const trimmed = val.trim();
     if (!trimmed) return;
-    // 只对完整代码触发搜索：6位A股 或 5位港股
-    const is6 = /^\d{6}$/.test(trimmed);
-    const is5 = /^\d{5}$/.test(trimmed);
-    if (!is6 && !is5) return;
-    // 5位时延迟更长，给用户继续输入第6位的机会
-    const delay = is5 ? 1000 : 300;
+    // 1-6位纯数字触发搜索（港股可输入 2400 等短代码）
+    if (!/^\d{1,6}$/.test(trimmed)) return;
+    // 短于5位时延迟更长，给用户继续输入的机会
+    const delay = trimmed.length < 5 ? 1200 : trimmed.length === 5 ? 800 : 300;
     searchTimer.current = setTimeout(async () => {
       setSearching(true);
       try {

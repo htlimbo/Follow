@@ -11,6 +11,7 @@ import ResearchCard from '../components/stock/ResearchCard';
 import AnchorsCard from '../components/stock/AnchorsCard';
 import AddEntryForm from '../components/stock/AddEntryForm';
 import TimelineEntry from '../components/stock/TimelineEntry';
+import { StockDetailSkeleton } from '../components/ui/Skeleton';
 
 export default function StockDetail() {
   const { id } = useParams();
@@ -50,13 +51,7 @@ export default function StockDetail() {
     load();
   }, [id, navigate]);
 
-  if (loading) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-sm text-text-tertiary">加载中...</p>
-      </div>
-    );
-  }
+  if (loading) return <StockDetailSkeleton />;
 
   if (!stock) return null;
 

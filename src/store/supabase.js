@@ -306,6 +306,38 @@ function mapReview(row) {
   };
 }
 
+// ── Portfolio settings (cash balance) ──
+
+export async function getCashBalance() {
+  const { data, error } = await supabase
+    .from('portfolio_settings')
+    .select('cash_balance')
+    .maybeSingle();
+  if (error) throw error;
+  return data?.cash_balance || '';
+}
+
+export async function setCashBalance(amount) {
+  // upsert: 每个用户只有一行（RLS 保证 user_id 隔离）
+  const { data: existing } = await supabase
+    .from('portfolio_settings')
+    .select('id')
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('portfolio_settings')
+      .update({ cash_balance: amount, updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('portfolio_settings')
+      .insert({ cash_balance: amount });
+    if (error) throw error;
+  }
+}
+
 // ── Export / Import ──
 
 export async function exportData() {

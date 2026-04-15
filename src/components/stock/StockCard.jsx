@@ -52,6 +52,11 @@ export default function StockCard({ stock, latestEntry, entryCount }) {
             {hasShares && (
               <span className="text-xs text-text-tertiary">{shares}股</span>
             )}
+            {stock.status === 'holding' && stock.createdAt && (
+              <span className="text-xs text-text-tertiary">
+                持仓{Math.max(1, Math.floor((Date.now() - new Date(stock.createdAt).getTime()) / 86400000))}天
+              </span>
+            )}
           </div>
         )}
 

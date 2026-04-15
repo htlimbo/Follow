@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import ErrorBoundary from './components/layout/ErrorBoundary';
 import Layout from './components/layout/Layout';
 import AuthGuard from './components/layout/AuthGuard';
 import Portfolio from './pages/Portfolio';
@@ -53,18 +54,20 @@ export default function App() {
 
   // trial 或 licensed → 正常进入应用
   return (
-    <LicenseContext.Provider value={{ ...licenseStatus, showActivation: () => setShowActivation(true) }}>
-      <BrowserRouter>
-        <AuthGuard>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Portfolio />} />
-              <Route path="/stock/:id" element={<StockDetail />} />
-              <Route path="/review" element={<Review />} />
-            </Route>
-          </Routes>
-        </AuthGuard>
-      </BrowserRouter>
-    </LicenseContext.Provider>
+    <ErrorBoundary>
+      <LicenseContext.Provider value={{ ...licenseStatus, showActivation: () => setShowActivation(true) }}>
+        <BrowserRouter>
+          <AuthGuard>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Portfolio />} />
+                <Route path="/stock/:id" element={<StockDetail />} />
+                <Route path="/review" element={<Review />} />
+              </Route>
+            </Routes>
+          </AuthGuard>
+        </BrowserRouter>
+      </LicenseContext.Provider>
+    </ErrorBoundary>
   );
 }
