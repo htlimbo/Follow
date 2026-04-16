@@ -1,136 +1,111 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, TrendingUp, ArrowUpDown, RefreshCw, Download, Upload } from 'lucide-react';
-import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices, getCashBalance, setCashBalance } from '../store';
-import { isTradingHour } from '../utils';
+import { useStockData } from '../contexts/StockDataContext';
 import { seedDemo } from '../seedDemo';
+import { getStocks, getAllEntries } from '../store';
 import AddStockModal from '../components/stock/AddStockModal';
 import StockCard from '../components/stock/StockCard';
 import PortfolioCharts from '../components/layout/PortfolioCharts';
 import { PortfolioSkeleton } from '../components/ui/Skeleton';
 
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 1024
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return isDesktop;
+}
+
 export default function Portfolio() {
-  const [stocks, setStocks] = useState([]);
-  const [entries, setEntries] = useState([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [filter, setFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('updated'); // updated | pnl | name
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [cashBalance, setCashBal] = useState('');
+  const isDesktop = useIsDesktop();
+
+  if (isDesktop) return <DesktopPortfolio />;
+  return <MobilePortfolio />;
+}
+
+// ─── Desktop: only charts + cash (stock list is in AppShell) ───
+
+function DesktopPortfolio() {
+  const { holdingStocks, cashBalance, handleSaveCash, loading } = useStockData();
   const [editingCash, setEditingCash] = useState(false);
   const [cashInput, setCashInput] = useState('');
-  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [s, e, cash] = await Promise.all([getStocks(), getAllEntries(), getCashBalance()]);
-        setStocks(s);
-        setEntries(e);
-        setCashBal(cash);
+  if (loading) return <PortfolioSkeleton />;
 
-        // 交易时间内自动刷新现价（周一至周五 9:15-15:05）
-        if (isTradingHour() && s.length > 0) {
-          try {
-            const prices = await refreshPrices(s);
-            if (Object.keys(prices).length > 0) {
-              setStocks(prev => prev.map(stock => {
-                const quote = prices[stock.code];
-                if (quote && quote.price != null) {
-                  return { ...stock, currentPrice: String(quote.price) };
-                }
-                return stock;
-              }));
-            }
-          } catch { /* 行情刷新失败不影响页面加载 */ }
-        }
-      } catch (err) {
-        console.error('Failed to load data:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
+  return (
+    <div>
+      <h2 className="text-lg font-semibold mb-4">组合统计</h2>
 
-  async function handleAdd(data) {
-    try {
-      const stock = await addStock(data);
-      setStocks(prev => [stock, ...prev]);
-    } catch (err) {
-      console.error('Failed to add stock:', err);
-    }
-  }
+      {holdingStocks.length > 0 ? (
+        <div>
+          {/* 现金仓位编辑 */}
+          <div className="bg-surface rounded-xl border border-border p-3 mb-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-text-tertiary">现金仓位</span>
+              {editingCash ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={cashInput}
+                    onChange={e => setCashInput(e.target.value)}
+                    placeholder="输入现金金额"
+                    className="w-32 px-2 py-1 rounded-lg border border-border text-sm text-right focus:outline-none focus:border-accent"
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { handleSaveCash(cashInput); setEditingCash(false); }
+                      if (e.key === 'Escape') setEditingCash(false);
+                    }}
+                  />
+                  <button onClick={() => { handleSaveCash(cashInput); setEditingCash(false); }} className="text-xs text-accent hover:underline">保存</button>
+                  <button onClick={() => setEditingCash(false)} className="text-xs text-text-tertiary hover:underline">取消</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setCashInput(cashBalance); setEditingCash(true); }}
+                  className="text-sm font-medium text-text hover:text-accent transition-colors"
+                >
+                  {cashBalance && parseFloat(cashBalance) > 0
+                    ? `${parseFloat(cashBalance).toLocaleString('zh-CN')} 元`
+                    : '点击设置'}
+                </button>
+              )}
+            </div>
+          </div>
+          <PortfolioCharts holdingStocks={holdingStocks} cashBalance={cashBalance} />
+        </div>
+      ) : (
+        <div className="text-center py-16">
+          <div className="w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center mx-auto mb-4">
+            <TrendingUp size={24} className="text-text-tertiary" />
+          </div>
+          <p className="text-text-secondary mb-1">还没有持仓股票</p>
+          <p className="text-sm text-text-tertiary">在左侧添加股票并设为持仓后，这里会显示组合统计</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
-  async function handleRefresh() {
-    setRefreshing(true);
-    try {
-      const prices = await refreshPrices(stocks);
-      if (Object.keys(prices).length > 0) {
-        setStocks(prev => prev.map(stock => {
-          const quote = prices[stock.code];
-          if (quote && quote.price != null) {
-            return { ...stock, currentPrice: String(quote.price) };
-          }
-          return stock;
-        }));
-      }
-    } catch (err) {
-      console.error('Failed to refresh prices:', err);
-    } finally {
-      setRefreshing(false);
-    }
-  }
+// ─── Mobile: full portfolio page (original layout) ───
 
-  async function handleExport() {
-    try {
-      const json = await exportData();
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `follow-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to export:', err);
-    }
-  }
+function MobilePortfolio() {
+  const {
+    stocks, loading, refreshing, holdingStocks, cashBalance,
+    latestEntryMap, entryCountMap, fileInputRef,
+    handleAdd, handleRefresh, handleExport, handleImport, handleSaveCash,
+    setStocks, setEntries, setLoading,
+  } = useStockData();
 
-  async function handleImport(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const ok = await importData(ev.target.result);
-      if (ok) {
-        const [s, en] = await Promise.all([getStocks(), getAllEntries()]);
-        setStocks(s);
-        setEntries(en);
-      } else {
-        alert('导入失败，请检查文件格式');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  }
-
-  async function handleSaveCash() {
-    try {
-      await setCashBalance(cashInput);
-      setCashBal(cashInput);
-      setEditingCash(false);
-    } catch (err) {
-      console.error('Failed to save cash balance:', err);
-    }
-  }
-
-  const latestEntryMap = {};
-  const entryCountMap = {};
-  entries.forEach(e => {
-    if (!latestEntryMap[e.stockId]) latestEntryMap[e.stockId] = e;
-    entryCountMap[e.stockId] = (entryCountMap[e.stockId] || 0) + 1;
-  });
+  const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('updated');
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingCash, setEditingCash] = useState(false);
+  const [cashInput, setCashInput] = useState('');
 
   function getPnlPct(s) {
     const cost = parseFloat(s.costPrice);
@@ -150,8 +125,6 @@ export default function Portfolio() {
     if (sortBy === 'name') return a.name.localeCompare(b.name, 'zh-CN');
     return getLastActivity(b) - getLastActivity(a);
   });
-
-  const holdingStocks = stocks.filter(s => s.status === 'holding');
 
   if (loading) return <PortfolioSkeleton />;
 
@@ -177,11 +150,8 @@ export default function Portfolio() {
         <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-0.5 text-text-tertiary">
             <ArrowUpDown size={13} />
-            <select
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value)}
-              className="text-xs bg-transparent border-none outline-none cursor-pointer text-text-secondary py-1 pr-1"
-            >
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+              className="text-xs bg-transparent border-none outline-none cursor-pointer text-text-secondary py-1 pr-1">
               <option value="updated">最近活跃</option>
               <option value="pnl">按盈亏</option>
               <option value="name">按名称</option>
@@ -207,9 +177,8 @@ export default function Portfolio() {
         </div>
       </div>
 
-      {/* Desktop: left-right layout; Mobile: stacked */}
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
-        {/* Left: Stock list */}
+      {/* Stock list + Charts */}
+      <div className="grid grid-cols-1 gap-6">
         <div>
           {filtered.length === 0 ? (
             <div className="text-center py-16">
@@ -247,35 +216,27 @@ export default function Portfolio() {
           )}
         </div>
 
-        {/* Right: Stats + Charts */}
         {holdingStocks.length > 0 && (
           <div>
-            {/* 现金仓位编辑 */}
             <div className="bg-surface rounded-xl border border-border p-3 mb-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-text-tertiary">现金仓位</span>
                 {editingCash ? (
                   <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={cashInput}
-                      onChange={e => setCashInput(e.target.value)}
-                      placeholder="输入现金金额"
+                    <input type="number" value={cashInput} onChange={e => setCashInput(e.target.value)} placeholder="输入现金金额"
                       className="w-32 px-2 py-1 rounded-lg border border-border text-sm text-right focus:outline-none focus:border-accent"
                       autoFocus
-                      onKeyDown={e => { if (e.key === 'Enter') handleSaveCash(); if (e.key === 'Escape') setEditingCash(false); }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') { handleSaveCash(cashInput); setEditingCash(false); }
+                        if (e.key === 'Escape') setEditingCash(false);
+                      }}
                     />
-                    <button onClick={handleSaveCash} className="text-xs text-accent hover:underline">保存</button>
+                    <button onClick={() => { handleSaveCash(cashInput); setEditingCash(false); }} className="text-xs text-accent hover:underline">保存</button>
                     <button onClick={() => setEditingCash(false)} className="text-xs text-text-tertiary hover:underline">取消</button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => { setCashInput(cashBalance); setEditingCash(true); }}
-                    className="text-sm font-medium text-text hover:text-accent transition-colors"
-                  >
-                    {cashBalance && parseFloat(cashBalance) > 0
-                      ? `${parseFloat(cashBalance).toLocaleString('zh-CN')} 元`
-                      : '点击设置'}
+                  <button onClick={() => { setCashInput(cashBalance); setEditingCash(true); }} className="text-sm font-medium text-text hover:text-accent transition-colors">
+                    {cashBalance && parseFloat(cashBalance) > 0 ? `${parseFloat(cashBalance).toLocaleString('zh-CN')} 元` : '点击设置'}
                   </button>
                 )}
               </div>

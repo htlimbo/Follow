@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, Briefcase, Eye, Archive } from 'lucide-react';
+import { Briefcase, Eye, Archive } from 'lucide-react';
 import { formatPnl, formatMoney, formatTime, STATUS_CONFIG } from '../../utils';
 
 const STATUS_ICONS = { holding: Briefcase, watching: Eye, closed: Archive };
 
-export default function StockCard({ stock, latestEntry, entryCount }) {
+export default function StockCard({ stock, latestEntry, entryCount, compact, selected, onSelect }) {
   const cfg = STATUS_CONFIG[stock.status] || STATUS_CONFIG.holding;
   const StatusIcon = STATUS_ICONS[stock.status] || Briefcase;
 
@@ -16,6 +16,51 @@ export default function StockCard({ stock, latestEntry, entryCount }) {
   const pnlPct = hasPrice ? ((current - cost) / Math.abs(cost) * 100) : null;
   const pnlAmount = hasPrice && hasShares ? (current - cost) * shares : null;
 
+  // Compact mode: used in desktop three-column layout
+  if (compact) {
+    return (
+      <button
+        onClick={onSelect}
+        className={`w-full text-left rounded-lg p-3 transition-all ${
+          selected
+            ? 'bg-accent/8 border border-accent/20 shadow-sm'
+            : 'hover:bg-surface-hover border border-transparent'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-semibold truncate">{stock.name}</span>
+            <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>
+              <StatusIcon size={10} />
+              {cfg.label}
+            </span>
+          </div>
+          {hasPrice && (
+            <span className={`text-xs font-medium shrink-0 ml-2 ${pnlPct >= 0 ? 'text-positive' : 'text-negative'}`}>
+              {formatPnl(pnlPct)}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-text-tertiary">
+          {stock.code && <span className="font-mono">{stock.code}</span>}
+          {hasPrice && <span className="font-mono">{current.toFixed(2)}</span>}
+          {pnlAmount !== null && (
+            <span className={pnlAmount >= 0 ? 'text-positive' : 'text-negative'}>
+              {pnlAmount >= 0 ? '+' : ''}{formatMoney(pnlAmount)}
+            </span>
+          )}
+          {stock.status === 'holding' && stock.createdAt && (
+            <span>持仓{Math.max(1, Math.floor((Date.now() - new Date(stock.createdAt).getTime()) / 86400000))}天</span>
+          )}
+        </div>
+        {latestEntry && (
+          <p className="text-xs text-text-secondary mt-1.5 line-clamp-1">{latestEntry.content}</p>
+        )}
+      </button>
+    );
+  }
+
+  // Full mode: used in mobile layout
   return (
     <Link to={`/stock/${stock.id}`}
       className="block bg-surface rounded-xl border border-border hover:border-border-light hover:shadow-sm transition-all no-underline text-text group">
@@ -30,7 +75,6 @@ export default function StockCard({ stock, latestEntry, entryCount }) {
               <StatusIcon size={12} />
               {cfg.label}
             </span>
-            <ChevronRight size={16} className="text-text-tertiary group-hover:text-text-secondary transition-colors" />
           </div>
         </div>
 

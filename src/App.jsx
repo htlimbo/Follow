@@ -1,8 +1,9 @@
 import { useState, useEffect, createContext } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ErrorBoundary from './components/layout/ErrorBoundary';
-import Layout from './components/layout/Layout';
+import AppShell from './components/layout/AppShell';
 import AuthGuard from './components/layout/AuthGuard';
+import { StockDataProvider } from './contexts/StockDataContext';
 import Portfolio from './pages/Portfolio';
 import StockDetail from './pages/StockDetail';
 import Review from './pages/Review';
@@ -58,13 +59,15 @@ export default function App() {
       <LicenseContext.Provider value={{ ...licenseStatus, showActivation: () => setShowActivation(true) }}>
         <BrowserRouter>
           <AuthGuard>
-            <Routes>
-              <Route element={<Layout />}>
-                <Route path="/" element={<Portfolio />} />
-                <Route path="/stock/:id" element={<StockDetail />} />
-                <Route path="/review" element={<Review />} />
-              </Route>
-            </Routes>
+            <StockDataProvider>
+              <Routes>
+                <Route element={<AppShell />}>
+                  <Route path="/" element={<Portfolio />} />
+                  <Route path="/stock/:id" element={<StockDetail />} />
+                  <Route path="/review" element={<Review />} />
+                </Route>
+              </Routes>
+            </StockDataProvider>
           </AuthGuard>
         </BrowserRouter>
       </LicenseContext.Provider>

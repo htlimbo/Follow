@@ -7,15 +7,32 @@ import {
   refreshPrices,
 } from '../store';
 import { ENTRY_TYPES } from '../utils';
+import { useStockData } from '../contexts/StockDataContext';
 import ResearchCard from '../components/stock/ResearchCard';
 import AnchorsCard from '../components/stock/AnchorsCard';
 import AddEntryForm from '../components/stock/AddEntryForm';
 import TimelineEntry from '../components/stock/TimelineEntry';
 import { StockDetailSkeleton } from '../components/ui/Skeleton';
 
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 1024
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return isDesktop;
+}
+
 export default function StockDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
+  const { updateLocalStock, removeLocalStock, addLocalEntry, removeLocalEntry } = useStockData();
+
   const [stock, setStock] = useState(null);
   const [entries, setEntries] = useState([]);
   const [showAddEntry, setShowAddEntry] = useState(false);
@@ -24,6 +41,12 @@ export default function StockDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
+    setStock(null);
+    setEntries([]);
+    setEntryFilter('all');
+    setShowAddEntry(false);
+
     async function load() {
       try {
         const s = await getStock(id);
@@ -32,13 +55,13 @@ export default function StockDetail() {
         const e = await getEntries(id);
         setEntries(e);
 
-        // 自动刷新现价
         try {
           const prices = await refreshPrices([s]);
           const quote = prices[s.code];
           if (quote && quote.price != null) {
             const newPrice = String(quote.price);
             setStock(prev => prev ? { ...prev, currentPrice: newPrice } : prev);
+            updateLocalStock(s.id, { currentPrice: newPrice });
           }
         } catch { /* 行情刷新失败不影响页面 */ }
       } catch (err) {
@@ -49,35 +72,39 @@ export default function StockDetail() {
       }
     }
     load();
-  }, [id, navigate]);
+  }, [id, navigate, updateLocalStock]);
 
   if (loading) return <StockDetailSkeleton />;
-
   if (!stock) return null;
 
   async function handleSaveResearch(updates) {
     const updated = await updateStock(id, updates);
     setStock(updated);
+    updateLocalStock(id, updates);
   }
 
   async function handleClosePosition({ content, price }) {
     const entry = await addEntry({ stockId: id, type: 'sell', content, price });
     setEntries(prev => [entry, ...prev]);
+    addLocalEntry(entry);
   }
 
   async function handleAddEntry(data) {
     const entry = await addEntry({ stockId: id, ...data });
     setEntries(prev => [entry, ...prev]);
+    addLocalEntry(entry);
     setShowAddEntry(false);
   }
 
   async function handleDeleteEntry(entryId) {
     await deleteEntry(entryId);
     setEntries(prev => prev.filter(e => e.id !== entryId));
+    removeLocalEntry(entryId);
   }
 
   async function handleDeleteStock() {
     await deleteStock(id);
+    removeLocalStock(id);
     navigate('/');
   }
 
@@ -86,9 +113,12 @@ export default function StockDetail() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Link to="/" className="text-text-tertiary hover:text-text p-1 rounded-lg hover:bg-surface-hover transition-colors">
-            <ArrowLeft size={18} />
-          </Link>
+          {/* 移动端显示返回箭头，桌面端不需要 */}
+          {!isDesktop && (
+            <Link to="/" className="text-text-tertiary hover:text-text p-1 rounded-lg hover:bg-surface-hover transition-colors">
+              <ArrowLeft size={18} />
+            </Link>
+          )}
           <div>
             <h1 className="text-xl font-semibold">{stock.name}</h1>
             {stock.code && <p className="text-sm text-text-tertiary font-mono">{stock.code}</p>}
@@ -100,9 +130,9 @@ export default function StockDetail() {
         </button>
       </div>
 
-      {/* Has entries: left-right layout on desktop; No entries: single column */}
+      {/* Content */}
       {entries.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6">
+        <div className={`grid grid-cols-1 ${isDesktop ? 'xl:grid-cols-[2fr_3fr]' : 'lg:grid-cols-[2fr_3fr]'} gap-6`}>
           {/* Left: Research + Anchors */}
           <div>
             <ResearchCard stock={stock} onSave={handleSaveResearch} onClose={handleClosePosition} />
@@ -152,12 +182,10 @@ export default function StockDetail() {
           </div>
         </div>
       ) : (
-        /* No entries: single column layout */
         <div>
           <ResearchCard stock={stock} onSave={handleSaveResearch} onClose={handleClosePosition} />
           <AnchorsCard stockId={id} />
 
-          {/* Timeline empty state + add entry */}
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
           </div>
