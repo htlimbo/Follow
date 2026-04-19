@@ -94,7 +94,7 @@ function MobileTopNav() {
 
 function StockListPanel() {
   const {
-    stocks, loading, refreshing, latestEntryMap, entryCountMap,
+    stocks, loading, refreshing, latestEntryMap, entryCountMap, priceHistoryMap,
     handleAdd, handleRefresh, handleExport, handleImport, fileInputRef,
     setStocks, setEntries, setLoading,
   } = useStockData();
@@ -229,6 +229,7 @@ function StockListPanel() {
                 stock={stock}
                 latestEntry={latestEntryMap[stock.id]}
                 entryCount={entryCountMap[stock.id] || 0}
+                priceHistory={priceHistoryMap[stock.id]}
                 compact
                 selected={stock.id === selectedStockId}
                 onSelect={() => navigate(`/stock/${stock.id}`)}

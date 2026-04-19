@@ -96,7 +96,7 @@ function DesktopPortfolio() {
 function MobilePortfolio() {
   const {
     stocks, loading, refreshing, holdingStocks, cashBalance,
-    latestEntryMap, entryCountMap, fileInputRef,
+    latestEntryMap, entryCountMap, priceHistoryMap, fileInputRef,
     handleAdd, handleRefresh, handleExport, handleImport, handleSaveCash,
     setStocks, setEntries, setLoading,
   } = useStockData();
@@ -210,7 +210,7 @@ function MobilePortfolio() {
           ) : (
             <div className="flex flex-col gap-3">
               {filtered.map(stock => (
-                <StockCard key={stock.id} stock={stock} latestEntry={latestEntryMap[stock.id]} entryCount={entryCountMap[stock.id] || 0} />
+                <StockCard key={stock.id} stock={stock} latestEntry={latestEntryMap[stock.id]} entryCount={entryCountMap[stock.id] || 0} priceHistory={priceHistoryMap[stock.id]} />
               ))}
             </div>
           )}

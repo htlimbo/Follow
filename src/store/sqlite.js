@@ -75,6 +75,19 @@ async function initTables() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS price_history (
+      id TEXT PRIMARY KEY,
+      stock_id TEXT NOT NULL,
+      price TEXT NOT NULL,
+      recorded_at TEXT NOT NULL,
+      FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
+    )
+  `);
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_price_history_stock_date
+    ON price_history (stock_id, recorded_at)
+  `);
   // 开启外键约束（SQLite 默认关闭）
   await db.execute('PRAGMA foreign_keys = ON');
 }
@@ -317,6 +330,7 @@ export async function deleteEntry(id) {
 export async function refreshPrices(stocks) {
   const prices = await fetchQuotes(stocks);
   const d = await getDb();
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
   for (const stock of stocks) {
     const quote = prices[stock.code];
@@ -328,10 +342,40 @@ export async function refreshPrices(stocks) {
           [newPrice, now(), stock.id]
         );
       }
+      // 记录当日价格历史（upsert）
+      const existing = await d.select(
+        'SELECT id FROM price_history WHERE stock_id = $1 AND recorded_at = $2',
+        [stock.id, today]
+      );
+      if (existing.length > 0) {
+        await d.execute(
+          'UPDATE price_history SET price = $1 WHERE id = $2',
+          [newPrice, existing[0].id]
+        );
+      } else {
+        await d.execute(
+          'INSERT INTO price_history (id, stock_id, price, recorded_at) VALUES ($1, $2, $3, $4)',
+          [uuid(), stock.id, newPrice, today]
+        );
+      }
     }
   }
 
   return prices;
+}
+
+// ── Price history ──
+
+export async function getPriceHistory(stockId, days = 30) {
+  const d = await getDb();
+  const rows = await d.select(
+    `SELECT price, recorded_at FROM price_history
+     WHERE stock_id = $1
+     ORDER BY recorded_at DESC
+     LIMIT $2`,
+    [stockId, days]
+  );
+  return rows.map(r => ({ price: r.price, date: r.recorded_at })).reverse();
 }
 
 // ── Stock search（直接复用 shared.js）──

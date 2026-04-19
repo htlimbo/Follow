@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices, getCashBalance, setCashBalance } from '../store';
+import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices, getCashBalance, setCashBalance, getPriceHistory } from '../store';
 import { isTradingHour } from '../utils';
 
 const StockDataContext = createContext(null);
@@ -10,6 +10,7 @@ export function StockDataProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [cashBalance, setCashBal] = useState('');
+  const [priceHistoryMap, setPriceHistoryMap] = useState({});
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -33,6 +34,18 @@ export function StockDataProvider({ children }) {
               }));
             }
           } catch { /* 行情刷新失败不影响页面加载 */ }
+        }
+
+        // 加载价格历史（用于 Sparkline）
+        if (s.length > 0) {
+          try {
+            const historyEntries = await Promise.all(
+              s.map(stock => getPriceHistory(stock.id, 30).then(h => [stock.id, h]))
+            );
+            const map = {};
+            historyEntries.forEach(([id, history]) => { map[id] = history; });
+            setPriceHistoryMap(map);
+          } catch { /* 价格历史加载失败不影响页面 */ }
         }
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -66,6 +79,13 @@ export function StockDataProvider({ children }) {
           return stock;
         }));
       }
+      // 刷新后更新价格历史
+      const historyEntries = await Promise.all(
+        stocks.map(stock => getPriceHistory(stock.id, 30).then(h => [stock.id, h]))
+      );
+      const map = {};
+      historyEntries.forEach(([id, history]) => { map[id] = history; });
+      setPriceHistoryMap(map);
     } catch (err) {
       console.error('Failed to refresh prices:', err);
     } finally {
@@ -143,7 +163,7 @@ export function StockDataProvider({ children }) {
   const holdingStocks = stocks.filter(s => s.status === 'holding');
 
   const value = {
-    stocks, entries, loading, refreshing, cashBalance,
+    stocks, entries, loading, refreshing, cashBalance, priceHistoryMap,
     holdingStocks, latestEntryMap, entryCountMap,
     fileInputRef,
     handleAdd, handleRefresh, handleExport, handleImport, handleSaveCash,

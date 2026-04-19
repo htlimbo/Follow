@@ -54,6 +54,7 @@ export const {
   // Price / search
   refreshPrices,
   searchStock,
+  getPriceHistory,
   // Review
   getReviewableEntries,
   updateEntryVerdict,

@@ -168,9 +168,11 @@ export async function deleteEntry(id) {
 
 export async function refreshPrices(stocks) {
   const prices = await fetchQuotes(stocks);
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
   // 批量更新数据库中的现价
   const updates = [];
+  const historyUpserts = [];
   for (const stock of stocks) {
     const quote = prices[stock.code];
     if (quote && quote.price != null) {
@@ -183,11 +185,34 @@ export async function refreshPrices(stocks) {
             .eq('id', stock.id)
         );
       }
+      // 记录当日价格历史（upsert by stock_id + recorded_at）
+      historyUpserts.push(
+        supabase
+          .from('price_history')
+          .upsert(
+            { stock_id: stock.id, price: newPrice, recorded_at: today },
+            { onConflict: 'stock_id,recorded_at' }
+          )
+      );
     }
   }
-  if (updates.length > 0) await Promise.all(updates);
+  const all = [...updates, ...historyUpserts];
+  if (all.length > 0) await Promise.all(all);
 
   return prices;
+}
+
+// ── Price history ──
+
+export async function getPriceHistory(stockId, days = 30) {
+  const { data, error } = await supabase
+    .from('price_history')
+    .select('price, recorded_at')
+    .eq('stock_id', stockId)
+    .order('recorded_at', { ascending: false })
+    .limit(days);
+  if (error) throw error;
+  return (data || []).map(r => ({ price: r.price, date: r.recorded_at })).reverse();
 }
 
 // ── Stock search（直接复用 shared.js）──
