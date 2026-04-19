@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, createContext } from 'react';
+import { useState, useEffect, useContext, createContext, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import { Plus, ArrowUpDown, RefreshCw, Download, Upload, TrendingUp, ClipboardCheck, LogOut } from 'lucide-react';
 
@@ -7,6 +7,7 @@ export const ImmersiveContext = createContext({ immersive: false, setImmersive: 
 import SideNav from './SideNav';
 import StockCard from '../stock/StockCard';
 import AddStockModal from '../stock/AddStockModal';
+import ResizeHandle from '../ui/ResizeHandle';
 import { useStockData } from '../../contexts/StockDataContext';
 import { PortfolioSkeleton } from '../ui/Skeleton';
 import { seedDemo } from '../../seedDemo';
@@ -40,14 +41,24 @@ function DesktopShell() {
   const location = useLocation();
   const isReview = location.pathname === '/review';
   const [immersive, setImmersive] = useState(false);
+  const [listWidth, setListWidth] = useState(320); // 默认 320px
+
+  const handleListResize = useCallback((delta) => {
+    setListWidth(prev => Math.max(240, Math.min(480, prev + delta)));
+  }, []);
 
   return (
     <ImmersiveContext.Provider value={{ immersive, setImmersive }}>
       <div className="flex h-screen overflow-hidden bg-bg">
         {!immersive && <SideNav />}
-        {!isReview && !immersive && <StockListPanel />}
+        {!isReview && !immersive && (
+          <>
+            <StockListPanel width={listWidth} />
+            <ResizeHandle onResize={handleListResize} />
+          </>
+        )}
         <main className="flex-1 overflow-y-auto">
-          <div className={`p-6 ${immersive ? 'max-w-3xl mx-auto' : 'max-w-4xl'}`}>
+          <div className={`p-6 ${immersive ? 'max-w-3xl mx-auto' : ''}`}>
             <Outlet />
           </div>
         </main>
@@ -98,7 +109,7 @@ function MobileTopNav() {
 
 // ─── Stock List Panel (middle column on desktop) ───
 
-function StockListPanel() {
+function StockListPanel({ width }) {
   const {
     stocks, loading, refreshing, latestEntryMap, entryCountMap, priceHistoryMap,
     handleAdd, handleRefresh, handleExport, handleImport, fileInputRef,
@@ -136,14 +147,14 @@ function StockListPanel() {
 
   if (loading) {
     return (
-      <div className="w-80 xl:w-96 border-r border-border bg-surface/50 overflow-y-auto shrink-0 p-4">
+      <div style={{ width }} className="border-r border-border bg-surface/50 overflow-y-auto shrink-0 p-4">
         <PortfolioSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="w-80 xl:w-96 border-r border-border bg-surface/50 overflow-y-auto shrink-0 flex flex-col">
+    <div style={{ width }} className="border-r border-border bg-surface/50 overflow-y-auto shrink-0 flex flex-col">
       {/* Header */}
       <div className="sticky top-0 bg-surface/80 backdrop-blur-sm z-10 px-4 pt-4 pb-2 border-b border-border-light">
         {/* Title + Add */}

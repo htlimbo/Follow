@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Trash2, Plus, Brain } from 'lucide-react';
+import ResizeHandle from '../components/ui/ResizeHandle';
 import {
   getStock, updateStock, deleteStock,
   getEntries, addEntry, deleteEntry,
@@ -39,6 +40,15 @@ export default function StockDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [entryFilter, setEntryFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [leftPct, setLeftPct] = useState(40); // 左栏默认 40%
+
+  const handleDetailResize = useCallback((delta) => {
+    // 根据父容器宽度把 px delta 转换为百分比
+    const container = document.getElementById('stock-detail-columns');
+    if (!container) return;
+    const pctDelta = (delta / container.offsetWidth) * 100;
+    setLeftPct(prev => Math.max(25, Math.min(65, prev + pctDelta)));
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -132,55 +142,108 @@ export default function StockDetail() {
 
       {/* Content */}
       {entries.length > 0 ? (
-        <div className={`grid grid-cols-1 ${isDesktop ? 'xl:grid-cols-[2fr_3fr]' : 'lg:grid-cols-[2fr_3fr]'} gap-6`}>
-          {/* Left: Research + Anchors */}
-          <div>
-            <ResearchCard stock={stock} onSave={handleSaveResearch} onClose={handleClosePosition} />
-            <AnchorsCard stockId={id} />
-          </div>
-
-          {/* Right: Timeline */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
-              {!showAddEntry && (
-                <button onClick={() => setShowAddEntry(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-accent hover:bg-accent-light transition-colors">
-                  <Plus size={14} /> 记录想法
-                </button>
-              )}
+        isDesktop ? (
+          /* 桌面端：可拖拽调整左右宽度 */
+          <div id="stock-detail-columns" className="flex gap-0 items-stretch">
+            <div className="overflow-y-auto shrink-0" style={{ width: `${leftPct}%` }}>
+              <div className="pr-3">
+                <ResearchCard stock={stock} onSave={handleSaveResearch} onClose={handleClosePosition} />
+                <AnchorsCard stockId={id} />
+              </div>
             </div>
 
-            <div className="flex items-center gap-1 mb-4 flex-wrap">
-              <button onClick={() => setEntryFilter('all')}
-                className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
-                  entryFilter === 'all' ? 'bg-accent-light text-accent font-medium' : 'text-text-tertiary hover:bg-surface-hover'
-                }`}>
-                全部
-              </button>
-              {Object.entries(ENTRY_TYPES).map(([key, cfg]) => {
-                const count = entries.filter(e => e.type === key).length;
-                if (count === 0) return null;
-                return (
-                  <button key={key} onClick={() => setEntryFilter(key)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-colors ${
-                      entryFilter === key ? `${cfg.bg} ${cfg.color} font-medium` : 'text-text-tertiary hover:bg-surface-hover'
-                    }`}>
-                    {cfg.label} <span className="opacity-60">{count}</span>
+            <ResizeHandle onResize={handleDetailResize} />
+
+            <div className="flex-1 min-w-0 pl-3">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
+                {!showAddEntry && (
+                  <button onClick={() => setShowAddEntry(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-accent hover:bg-accent-light transition-colors">
+                    <Plus size={14} /> 记录想法
                   </button>
-                );
-              })}
-            </div>
+                )}
+              </div>
 
-            {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} stock={stock} />}
+              <div className="flex items-center gap-1 mb-4 flex-wrap">
+                <button onClick={() => setEntryFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                    entryFilter === 'all' ? 'bg-accent-light text-accent font-medium' : 'text-text-tertiary hover:bg-surface-hover'
+                  }`}>
+                  全部
+                </button>
+                {Object.entries(ENTRY_TYPES).map(([key, cfg]) => {
+                  const count = entries.filter(e => e.type === key).length;
+                  if (count === 0) return null;
+                  return (
+                    <button key={key} onClick={() => setEntryFilter(key)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                        entryFilter === key ? `${cfg.bg} ${cfg.color} font-medium` : 'text-text-tertiary hover:bg-surface-hover'
+                      }`}>
+                      {cfg.label} <span className="opacity-60">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="mt-2">
-              {(entryFilter === 'all' ? entries : entries.filter(e => e.type === entryFilter)).map(entry => (
-                <TimelineEntry key={entry.id} entry={entry} onDelete={handleDeleteEntry} />
-              ))}
+              {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} stock={stock} />}
+
+              <div className="mt-2">
+                {(entryFilter === 'all' ? entries : entries.filter(e => e.type === entryFilter)).map(entry => (
+                  <TimelineEntry key={entry.id} entry={entry} onDelete={handleDeleteEntry} />
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* 移动端：上下堆叠 */
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6">
+            <div>
+              <ResearchCard stock={stock} onSave={handleSaveResearch} onClose={handleClosePosition} />
+              <AnchorsCard stockId={id} />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">思考时间线</h2>
+                {!showAddEntry && (
+                  <button onClick={() => setShowAddEntry(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-accent hover:bg-accent-light transition-colors">
+                    <Plus size={14} /> 记录想法
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 mb-4 flex-wrap">
+                <button onClick={() => setEntryFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                    entryFilter === 'all' ? 'bg-accent-light text-accent font-medium' : 'text-text-tertiary hover:bg-surface-hover'
+                  }`}>
+                  全部
+                </button>
+                {Object.entries(ENTRY_TYPES).map(([key, cfg]) => {
+                  const count = entries.filter(e => e.type === key).length;
+                  if (count === 0) return null;
+                  return (
+                    <button key={key} onClick={() => setEntryFilter(key)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                        entryFilter === key ? `${cfg.bg} ${cfg.color} font-medium` : 'text-text-tertiary hover:bg-surface-hover'
+                      }`}>
+                      {cfg.label} <span className="opacity-60">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} stock={stock} />}
+
+              <div className="mt-2">
+                {(entryFilter === 'all' ? entries : entries.filter(e => e.type === entryFilter)).map(entry => (
+                  <TimelineEntry key={entry.id} entry={entry} onDelete={handleDeleteEntry} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )
       ) : (
         <div>
           <ResearchCard stock={stock} onSave={handleSaveResearch} onClose={handleClosePosition} />
