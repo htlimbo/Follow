@@ -172,7 +172,7 @@ export default function StockDetail() {
               })}
             </div>
 
-            {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} />}
+            {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} stock={stock} />}
 
             <div className="mt-2">
               {(entryFilter === 'all' ? entries : entries.filter(e => e.type === entryFilter)).map(entry => (
@@ -191,7 +191,7 @@ export default function StockDetail() {
           </div>
 
           {showAddEntry ? (
-            <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} />
+            <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} stock={stock} />
           ) : (
             <div className="bg-surface rounded-xl border border-border-light p-8 text-center">
               <Brain size={36} className="text-text-tertiary mx-auto mb-3" />

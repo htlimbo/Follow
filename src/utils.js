@@ -64,4 +64,11 @@ export const ENTRY_TYPES = {
   discipline: { label: '纪律执行', color: 'text-accent', bg: 'bg-accent-light' },
 };
 
+export const LOGIC_TAGS = [
+  { key: 'macro', label: '#宏观驱动', color: 'text-blue-600', bg: 'bg-blue-50' },
+  { key: 'fundamental', label: '#基本面反转', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  { key: 'sentiment', label: '#情绪博弈', color: 'text-amber-600', bg: 'bg-amber-50' },
+  { key: 'arbitrage', label: '#套利', color: 'text-purple-600', bg: 'bg-purple-50' },
+];
+
 export const CHART_COLORS = ['#4f46e5', '#7c3aed', '#0891b2', '#059669', '#d97706', '#f43f5e', '#6366f1', '#0d9488'];

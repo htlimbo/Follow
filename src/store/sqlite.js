@@ -52,11 +52,16 @@ async function initTables() {
       type TEXT NOT NULL DEFAULT 'thought',
       content TEXT NOT NULL DEFAULT '',
       price TEXT DEFAULT '',
+      snapshot_data TEXT DEFAULT NULL,
+      logic_tags TEXT DEFAULT NULL,
       review_verdict TEXT DEFAULT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
     )
   `);
+  // 为已有数据库添加新列（IF NOT EXISTS 不支持 ALTER，用 try/catch 兼容）
+  try { await db.execute('ALTER TABLE entries ADD COLUMN snapshot_data TEXT DEFAULT NULL'); } catch {}
+  try { await db.execute('ALTER TABLE entries ADD COLUMN logic_tags TEXT DEFAULT NULL'); } catch {}
   await db.execute(`
     CREATE TABLE IF NOT EXISTS reviews (
       id TEXT PRIMARY KEY,
@@ -134,12 +139,18 @@ function mapAnchor(row) {
 }
 
 function mapEntry(row) {
+  let snapshotData = null;
+  let logicTags = null;
+  try { if (row.snapshot_data) snapshotData = JSON.parse(row.snapshot_data); } catch {}
+  try { if (row.logic_tags) logicTags = JSON.parse(row.logic_tags); } catch {}
   return {
     id: row.id,
     stockId: row.stock_id,
     type: row.type,
     content: row.content,
     price: row.price || '',
+    snapshotData,
+    logicTags,
     reviewVerdict: row.review_verdict || null,
     createdAt: row.created_at,
   };
@@ -307,14 +318,17 @@ export async function getAllEntries() {
   return rows.map(mapEntry);
 }
 
-export async function addEntry({ stockId, type = 'thought', content, price = '' }) {
+export async function addEntry({ stockId, type = 'thought', content, price = '', snapshotData = null, logicTags = null }) {
   const d = await getDb();
   const id = uuid();
   const ts = now();
   await d.execute(
-    `INSERT INTO entries (id, stock_id, type, content, price, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, stockId, type, content, price, ts]
+    `INSERT INTO entries (id, stock_id, type, content, price, snapshot_data, logic_tags, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [id, stockId, type, content, price,
+     snapshotData ? JSON.stringify(snapshotData) : null,
+     logicTags && logicTags.length > 0 ? JSON.stringify(logicTags) : null,
+     ts]
   );
   const rows = await d.select('SELECT * FROM entries WHERE id = $1', [id]);
   return mapEntry(rows[0]);

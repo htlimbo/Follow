@@ -1,6 +1,9 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, createContext } from 'react';
 import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import { Plus, ArrowUpDown, RefreshCw, Download, Upload, TrendingUp, ClipboardCheck, LogOut } from 'lucide-react';
+
+// 沉浸写作模式 context
+export const ImmersiveContext = createContext({ immersive: false, setImmersive: () => {} });
 import SideNav from './SideNav';
 import StockCard from '../stock/StockCard';
 import AddStockModal from '../stock/AddStockModal';
@@ -36,17 +39,20 @@ export default function AppShell() {
 function DesktopShell() {
   const location = useLocation();
   const isReview = location.pathname === '/review';
+  const [immersive, setImmersive] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg">
-      <SideNav />
-      {!isReview && <StockListPanel />}
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-6 max-w-4xl">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+    <ImmersiveContext.Provider value={{ immersive, setImmersive }}>
+      <div className="flex h-screen overflow-hidden bg-bg">
+        {!immersive && <SideNav />}
+        {!isReview && !immersive && <StockListPanel />}
+        <main className="flex-1 overflow-y-auto">
+          <div className={`p-6 ${immersive ? 'max-w-3xl mx-auto' : 'max-w-4xl'}`}>
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </ImmersiveContext.Provider>
   );
 }
 

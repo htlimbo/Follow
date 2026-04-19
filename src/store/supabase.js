@@ -144,15 +144,13 @@ export async function getAllEntries() {
   return (data || []).map(mapEntry);
 }
 
-export async function addEntry({ stockId, type = 'thought', content, price = '' }) {
+export async function addEntry({ stockId, type = 'thought', content, price = '', snapshotData = null, logicTags = null }) {
+  const row = { stock_id: stockId, type, content, price };
+  if (snapshotData) row.snapshot_data = snapshotData;
+  if (logicTags && logicTags.length > 0) row.logic_tags = logicTags;
   const { data, error } = await supabase
     .from('entries')
-    .insert({
-      stock_id: stockId,
-      type,
-      content,
-      price,
-    })
+    .insert(row)
     .select()
     .single();
   if (error) throw error;
@@ -487,6 +485,8 @@ function mapEntry(row) {
     type: row.type,
     content: row.content,
     price: row.price || '',
+    snapshotData: row.snapshot_data || null,
+    logicTags: row.logic_tags || null,
     reviewVerdict: row.review_verdict || null,
     createdAt: row.created_at,
   };
