@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { TrendingUp, BookOpen, Anchor, ClipboardCheck } from 'lucide-react';
+import { BookOpen, Anchor, ClipboardCheck } from 'lucide-react';
+import { Wordmark } from '../components/ui/Logo';
 import { supabase } from '../supabaseClient';
 
 const FEATURES = [
@@ -57,9 +58,8 @@ export default function Login() {
         <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
           {/* Left: Hero */}
           <div>
-            <div className="flex items-center gap-2.5 mb-6">
-              <TrendingUp size={32} className="text-accent" />
-              <span className="text-3xl font-semibold tracking-tight">Follow</span>
+            <div className="mb-6">
+              <Wordmark size={32} textClass="text-3xl" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold leading-snug mb-4">
               记录你的投资思考，<br />而不只是交易记录

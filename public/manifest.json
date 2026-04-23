@@ -1,6 +1,6 @@
 {
-  "name": "Follow — 投资思考记录",
-  "short_name": "Follow",
+  "name": "FollowMind — 投资思考记录",
+  "short_name": "FollowMind",
   "description": "记录你的投资思考，而不只是交易记录",
   "start_url": "/",
   "display": "standalone",

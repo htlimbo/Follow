@@ -4,6 +4,7 @@ import ErrorBoundary from './components/layout/ErrorBoundary';
 import AppShell from './components/layout/AppShell';
 import AuthGuard from './components/layout/AuthGuard';
 import { StockDataProvider } from './contexts/StockDataContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import Portfolio from './pages/Portfolio';
 import StockDetail from './pages/StockDetail';
 import Review from './pages/Review';
@@ -56,21 +57,23 @@ export default function App() {
   // trial 或 licensed → 正常进入应用
   return (
     <ErrorBoundary>
-      <LicenseContext.Provider value={{ ...licenseStatus, showActivation: () => setShowActivation(true) }}>
-        <BrowserRouter>
-          <AuthGuard>
-            <StockDataProvider>
-              <Routes>
-                <Route element={<AppShell />}>
-                  <Route path="/" element={<Portfolio />} />
-                  <Route path="/stock/:id" element={<StockDetail />} />
-                  <Route path="/review" element={<Review />} />
-                </Route>
-              </Routes>
-            </StockDataProvider>
-          </AuthGuard>
-        </BrowserRouter>
-      </LicenseContext.Provider>
+      <ThemeProvider>
+        <LicenseContext.Provider value={{ ...licenseStatus, showActivation: () => setShowActivation(true) }}>
+          <BrowserRouter>
+            <AuthGuard>
+              <StockDataProvider>
+                <Routes>
+                  <Route element={<AppShell />}>
+                    <Route path="/" element={<Portfolio />} />
+                    <Route path="/stock/:id" element={<StockDetail />} />
+                    <Route path="/review" element={<Review />} />
+                  </Route>
+                </Routes>
+              </StockDataProvider>
+            </AuthGuard>
+          </BrowserRouter>
+        </LicenseContext.Provider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

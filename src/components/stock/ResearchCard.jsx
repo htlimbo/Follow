@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit3, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { Edit3, Save, ChevronDown, ChevronUp, Check, X } from 'lucide-react';
 import { formatMoney } from '../../utils';
 
 const STATUS_OPTIONS = [
@@ -22,7 +22,6 @@ export default function ResearchCard({ stock, onSave, onClose }) {
   const [expanded, setExpanded] = useState(true);
 
   async function handleSave() {
-    // 检测从持仓变为已清仓，自动生成盈亏快照
     if (form.status === 'closed' && stock.status === 'holding' && onClose) {
       const cost = parseFloat(stock.costPrice);
       const current = parseFloat(stock.currentPrice);
@@ -40,154 +39,153 @@ export default function ResearchCard({ stock, onSave, onClose }) {
     setEditing(false);
   }
 
-  const cost = parseFloat(form.costPrice);
-  const current = parseFloat(form.currentPrice);
-  const shares = parseFloat(form.shares);
-  const hasPrice = !isNaN(cost) && !isNaN(current) && cost !== 0;
-  const hasShares = !isNaN(shares) && shares > 0;
-  const pnlPct = hasPrice ? ((current - cost) / Math.abs(cost) * 100) : null;
-  const pnlAmount = hasPrice && hasShares ? (current - cost) * shares : null;
-  const marketValue = !isNaN(current) && hasShares ? current * shares : null;
+  function resetForm() {
+    setEditing(false);
+    setForm({
+      thesis: stock.thesis || '', bullCase: stock.bullCase || '', bearCase: stock.bearCase || '',
+      costPrice: stock.costPrice || '', currentPrice: stock.currentPrice || '',
+      shares: stock.shares || '', status: stock.status || 'holding',
+    });
+  }
 
   return (
-    <div className="bg-surface rounded-xl border border-border mb-6">
-      <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => !editing && setExpanded(!expanded)}>
-        <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">研究摘要</h2>
-        <div className="flex items-center gap-2">
+    <div className="mt-7">
+      {/* Section label */}
+      <div className="font-serif text-sm font-semibold flex items-center justify-between mb-2.5">
+        <span
+          className={!editing ? 'cursor-pointer' : ''}
+          onClick={() => !editing && setExpanded(!expanded)}
+        >
+          研究摘要
           {!editing && (
-            <button onClick={e => { e.stopPropagation(); setEditing(true); setExpanded(true); }}
-              className="text-text-tertiary hover:text-accent p-1 rounded-lg hover:bg-surface-hover transition-colors">
-              <Edit3 size={15} />
-            </button>
+            <span className="ml-2 inline-block text-[var(--ink-faint)]">
+              {expanded ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />}
+            </span>
           )}
-          {!editing && (expanded ? <ChevronUp size={16} className="text-text-tertiary" /> : <ChevronDown size={16} className="text-text-tertiary" />)}
-        </div>
+        </span>
+        {!editing && (
+          <button onClick={() => { setEditing(true); setExpanded(true); }}
+            className="text-[var(--ink-faint)] hover:text-[var(--accent)] bg-transparent border-0 cursor-pointer p-1">
+            <Edit3 size={14} />
+          </button>
+        )}
       </div>
 
-      {expanded && (
-        <div className="px-4 pb-4">
+      {expanded && !editing && (
+        <div>
+          {/* Thesis */}
+          {form.thesis ? (
+            <div className="font-serif text-sm leading-[1.8] text-[var(--ink)] p-3.5 bg-[var(--bg-raised)] border border-[var(--line)] rounded-[var(--radius)] tracking-wide mb-4">
+              <span className="float-left text-[32px] leading-[0.9] pr-1.5 pt-1 text-[var(--accent)] font-semibold">
+                {form.thesis.charAt(0)}
+              </span>
+              {form.thesis.slice(1)}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--ink-faint)] italic mb-4">还没有写投资逻辑</p>
+          )}
+
+          {/* Bull / Bear */}
+          {(form.bullCase || form.bearCase) && (
+            <>
+              <div className="font-serif text-sm font-semibold mb-2.5">看多 & 风险</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                {form.bullCase && (
+                  <div className="p-3.5 border border-[var(--line)] rounded-[var(--radius)] bg-[var(--bg-raised)]">
+                    <div className="text-xs font-semibold tracking-wider uppercase mb-2.5 flex items-center gap-1.5 text-positive">
+                      <Check size={12} /> 看好理由
+                    </div>
+                    <div className="font-serif text-[13px] leading-[1.7] text-[var(--ink)] whitespace-pre-wrap">{form.bullCase}</div>
+                  </div>
+                )}
+                {form.bearCase && (
+                  <div className="p-3.5 border border-[var(--line)] rounded-[var(--radius)] bg-[var(--bg-raised)]">
+                    <div className="text-xs font-semibold tracking-wider uppercase mb-2.5 flex items-center gap-1.5 text-negative">
+                      <X size={12} /> 风险点
+                    </div>
+                    <div className="font-serif text-[13px] leading-[1.7] text-[var(--ink)] whitespace-pre-wrap">{form.bearCase}</div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Editing form */}
+      {expanded && editing && (
+        <div>
           {/* Price grid */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+          <div className="grid grid-cols-3 gap-3 mb-4">
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">成本价</label>
-              {editing ? (
-                <input type="text" value={form.costPrice} onChange={e => setForm(f => ({...f, costPrice: e.target.value}))}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-border text-sm focus:outline-none focus:border-accent" />
-              ) : (
-                <p className="text-sm font-mono">{form.costPrice || '—'}</p>
-              )}
+              <label className="block text-[11px] text-[var(--ink-faint)] tracking-widest uppercase mb-1.5">成本价</label>
+              <input type="text" value={form.costPrice} onChange={e => setForm(f => ({...f, costPrice: e.target.value}))}
+                className="w-full px-2.5 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-mono focus:outline-none focus:border-[var(--accent)]" />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">现价</label>
-              {editing ? (
-                <input type="text" value={form.currentPrice} onChange={e => setForm(f => ({...f, currentPrice: e.target.value}))}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-border text-sm focus:outline-none focus:border-accent" />
-              ) : (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-sm font-mono">{form.currentPrice || '—'}</span>
-                  {pnlPct !== null && (
-                    <span className={`text-xs font-medium ${pnlPct >= 0 ? 'text-positive' : 'text-negative'}`}>
-                      {pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%
-                    </span>
-                  )}
-                </div>
-              )}
+              <label className="block text-[11px] text-[var(--ink-faint)] tracking-widest uppercase mb-1.5">现价</label>
+              <input type="text" value={form.currentPrice} onChange={e => setForm(f => ({...f, currentPrice: e.target.value}))}
+                className="w-full px-2.5 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-mono focus:outline-none focus:border-[var(--accent)]" />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">持仓数量</label>
-              {editing ? (
-                <input type="text" value={form.shares} onChange={e => setForm(f => ({...f, shares: e.target.value}))}
-                  placeholder="股数"
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-border text-sm focus:outline-none focus:border-accent" />
-              ) : (
-                <p className="text-sm font-mono">{form.shares ? `${form.shares}股` : '—'}</p>
-              )}
+              <label className="block text-[11px] text-[var(--ink-faint)] tracking-widest uppercase mb-1.5">持仓数量</label>
+              <input type="text" value={form.shares} onChange={e => setForm(f => ({...f, shares: e.target.value}))} placeholder="股数"
+                className="w-full px-2.5 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-mono focus:outline-none focus:border-[var(--accent)]" />
             </div>
           </div>
 
-          {/* P&L summary (non-editing) */}
-          {!editing && pnlAmount !== null && (
-            <div className={`flex items-center gap-4 px-3 py-2.5 rounded-lg mb-4 ${pnlAmount >= 0 ? 'bg-positive-light' : 'bg-negative-light'}`}>
-              <div>
-                <span className="text-xs text-text-tertiary">盈亏金额</span>
-                <p className={`text-base font-semibold ${pnlAmount >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {pnlAmount >= 0 ? '+' : ''}{formatMoney(pnlAmount)}
-                </p>
-              </div>
-              {marketValue !== null && (
-                <div>
-                  <span className="text-xs text-text-tertiary">持仓市值</span>
-                  <p className="text-base font-semibold">{formatMoney(marketValue)}</p>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Status */}
-          {editing && (
-            <div className="mb-4">
-              <label className="block text-xs text-text-tertiary mb-1.5">状态</label>
-              <div className="flex gap-2">
-                {STATUS_OPTIONS.map(opt => (
-                  <button key={opt.key} type="button" onClick={() => setForm(f => ({...f, status: opt.key}))}
-                    className={`flex-1 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                      form.status === opt.key ? 'border-accent bg-accent-light text-accent' : 'border-border text-text-secondary hover:bg-surface-hover'
-                    }`}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+          <div className="mb-4">
+            <label className="block text-[11px] text-[var(--ink-faint)] tracking-widest uppercase mb-1.5">状态</label>
+            <div className="flex gap-2">
+              {STATUS_OPTIONS.map(opt => (
+                <button key={opt.key} type="button" onClick={() => setForm(f => ({...f, status: opt.key}))}
+                  className={`flex-1 py-1.5 rounded-[var(--radius)] text-sm font-medium border transition-colors cursor-pointer ${
+                    form.status === opt.key
+                      ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                      : 'border-[var(--line)] text-[var(--ink-soft)] hover:bg-[var(--bg-sunken)] bg-transparent'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
           {/* Thesis */}
           <div className="mb-4">
-            <label className="block text-xs text-text-tertiary mb-1">投资逻辑</label>
-            {editing ? (
-              <textarea value={form.thesis} onChange={e => setForm(f => ({...f, thesis: e.target.value}))}
-                rows={3} placeholder="这家公司为什么值得关注？核心逻辑是什么？"
-                className="w-full px-2.5 py-2 rounded-lg border border-border text-sm focus:outline-none focus:border-accent resize-none" />
-            ) : (
-              <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{form.thesis || '还没有写投资逻辑'}</p>
-            )}
+            <label className="block text-[11px] text-[var(--ink-faint)] tracking-widest uppercase mb-1.5">投资逻辑</label>
+            <textarea value={form.thesis} onChange={e => setForm(f => ({...f, thesis: e.target.value}))}
+              rows={3} placeholder="这家公司为什么值得关注？核心逻辑是什么？"
+              className="w-full px-3 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-serif leading-relaxed focus:outline-none focus:border-[var(--accent)] resize-none" />
           </div>
 
           {/* Bull / Bear */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">看好理由</label>
-              {editing ? (
-                <textarea value={form.bullCase} onChange={e => setForm(f => ({...f, bullCase: e.target.value}))}
-                  rows={3} placeholder="为什么看好？"
-                  className="w-full px-2.5 py-2 rounded-lg border border-border text-sm focus:outline-none focus:border-accent resize-none" />
-              ) : (
-                <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{form.bullCase || '—'}</p>
-              )}
+              <label className="block text-[11px] text-[var(--ink-faint)] tracking-widest uppercase mb-1.5">看好理由</label>
+              <textarea value={form.bullCase} onChange={e => setForm(f => ({...f, bullCase: e.target.value}))}
+                rows={3} placeholder="为什么看好？"
+                className="w-full px-3 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-serif leading-relaxed focus:outline-none focus:border-[var(--accent)] resize-none" />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">风险点</label>
-              {editing ? (
-                <textarea value={form.bearCase} onChange={e => setForm(f => ({...f, bearCase: e.target.value}))}
-                  rows={3} placeholder="主要风险是什么？"
-                  className="w-full px-2.5 py-2 rounded-lg border border-border text-sm focus:outline-none focus:border-accent resize-none" />
-              ) : (
-                <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{form.bearCase || '—'}</p>
-              )}
+              <label className="block text-[11px] text-[var(--ink-faint)] tracking-widest uppercase mb-1.5">风险点</label>
+              <textarea value={form.bearCase} onChange={e => setForm(f => ({...f, bearCase: e.target.value}))}
+                rows={3} placeholder="主要风险是什么？"
+                className="w-full px-3 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-serif leading-relaxed focus:outline-none focus:border-[var(--accent)] resize-none" />
             </div>
           </div>
 
-          {editing && (
-            <div className="flex gap-2">
-              <button onClick={handleSave}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors">
-                <Save size={14} /> 保存
-              </button>
-              <button onClick={() => { setEditing(false); setForm({ thesis: stock.thesis || '', bullCase: stock.bullCase || '', bearCase: stock.bearCase || '', costPrice: stock.costPrice || '', currentPrice: stock.currentPrice || '', shares: stock.shares || '', status: stock.status || 'holding' }); }}
-                className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors">
-                取消
-              </button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <button onClick={handleSave}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer border-0"
+              style={{ background: 'var(--ink)', color: 'var(--bg)' }}>
+              <Save size={14} /> 保存
+            </button>
+            <button onClick={resetForm}
+              className="px-4 py-2 rounded-full text-sm text-[var(--ink-soft)] bg-transparent border-0 cursor-pointer hover:text-[var(--ink)] transition-colors">
+              取消
+            </button>
+          </div>
         </div>
       )}
     </div>

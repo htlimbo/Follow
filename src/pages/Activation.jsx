@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { TrendingUp, Key, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Key, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Wordmark } from '../components/ui/Logo';
 
 export default function Activation({ onActivated, onActivate, onBack }) {
   const [key, setKey] = useState('');
@@ -39,9 +40,8 @@ export default function Activation({ onActivated, onActivate, onBack }) {
         )}
 
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <TrendingUp size={28} className="text-accent" />
-          <span className="text-xl font-semibold tracking-tight">Follow Pro</span>
+        <div className="flex items-center justify-center mb-8">
+          <Wordmark size={28} textClass="text-xl" />
         </div>
 
         {/* Expired notice */}

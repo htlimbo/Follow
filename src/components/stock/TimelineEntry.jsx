@@ -1,71 +1,70 @@
-import { Trash2, Brain, ShoppingCart, LogOut, RefreshCw, Shield, Camera } from 'lucide-react';
+import { Trash2, Camera } from 'lucide-react';
 import { ENTRY_TYPES, LOGIC_TAGS, formatDate, formatPnl } from '../../utils';
 
-const ENTRY_ICONS = {
-  thought: Brain,
-  buy: ShoppingCart,
-  sell: LogOut,
-  adjust: RefreshCw,
-  discipline: Shield,
+const ENTRY_DOT_COLORS = {
+  thought: 'border-[var(--accent)]',
+  buy: 'border-[var(--gain)]',
+  sell: 'border-[var(--loss)]',
+  adjust: 'border-[var(--gold)]',
+  discipline: 'border-[var(--accent)]',
 };
 
 function getTagConfig(key) {
-  return LOGIC_TAGS.find(t => t.key === key) || { label: `#${key}`, color: 'text-gray-500', bg: 'bg-gray-50' };
+  return LOGIC_TAGS.find(t => t.key === key) || { label: `#${key}`, color: 'text-[var(--accent)]', bg: 'bg-[var(--accent-soft)]' };
 }
 
 export default function TimelineEntry({ entry, onDelete }) {
   const cfg = ENTRY_TYPES[entry.type] || ENTRY_TYPES.thought;
-  const Icon = ENTRY_ICONS[entry.type] || Brain;
+  const dotColor = ENTRY_DOT_COLORS[entry.type] || ENTRY_DOT_COLORS.thought;
   const snap = entry.snapshotData;
   const tags = entry.logicTags;
 
   return (
-    <div className="relative pl-8 pb-6 group">
-      <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border-light" />
-      <div className={`absolute left-0 top-0.5 w-6 h-6 rounded-full ${cfg.bg} flex items-center justify-center`}>
-        <Icon size={12} className={cfg.color} />
+    <div className="relative mb-5 group">
+      {/* Dot on the timeline */}
+      <div className={`absolute -left-[21px] top-[8px] w-[10px] h-[10px] rounded-full bg-[var(--bg)] border-2 ${dotColor}`} />
+
+      {/* Meta row */}
+      <div className="flex items-baseline gap-2.5 mb-1.5">
+        <span className="font-serif text-[13px] font-semibold text-[var(--ink)]">{cfg.label}</span>
+        {entry.price && <span className="text-[11px] text-[var(--ink-faint)] font-mono">@ {entry.price}</span>}
+        <span className="text-[11px] text-[var(--ink-faint)] font-mono">{formatDate(entry.createdAt)}</span>
+        {snap && <Camera size={11} className="text-[var(--ink-faint)]" title="含存证数据" />}
+        <button onClick={() => onDelete(entry.id)}
+          className="ml-auto opacity-0 group-hover:opacity-100 text-[var(--ink-faint)] hover:text-[var(--loss)] bg-transparent border-0 p-0.5 rounded cursor-pointer transition-all">
+          <Trash2 size={12} />
+        </button>
       </div>
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <span className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
-          {entry.price && <span className="text-xs text-text-tertiary font-mono">@ {entry.price}</span>}
-          <span className="text-xs text-text-tertiary">{formatDate(entry.createdAt)}</span>
-          {snap && <Camera size={11} className="text-text-tertiary" title="含存证数据" />}
-          <button onClick={() => onDelete(entry.id)}
-            className="ml-auto opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-negative p-0.5 rounded transition-all">
-            <Trash2 size={12} />
-          </button>
-        </div>
 
-        <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{entry.content}</p>
+      {/* Content */}
+      <p className="font-serif text-[13.5px] leading-[1.7] text-[var(--ink)] whitespace-pre-wrap">{entry.content}</p>
 
-        {/* 逻辑标签 */}
-        {tags && tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {tags.map(t => {
-              const tc = getTagConfig(t);
-              return (
-                <span key={t} className={`px-1.5 py-0.5 rounded text-[10px] ${tc.bg} ${tc.color}`}>
-                  {tc.label}
-                </span>
-              );
-            })}
-          </div>
-        )}
-
-        {/* 存证快照 */}
-        {snap && (
-          <div className="flex items-center gap-3 mt-1.5 px-2 py-1 rounded bg-bg text-[11px] text-text-tertiary">
-            <span>存证价 <span className="font-mono font-medium text-text-secondary">{parseFloat(snap.currentPrice).toFixed(2)}</span></span>
-            {snap.pnlPct && (
-              <span className={parseFloat(snap.pnlPct) >= 0 ? 'text-positive' : 'text-negative'}>
-                {formatPnl(parseFloat(snap.pnlPct))}
+      {/* Logic tags */}
+      {tags && tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {tags.map(t => {
+            const tc = getTagConfig(t);
+            return (
+              <span key={t} className="inline-block px-2 py-0.5 rounded-full text-[11px] bg-[var(--accent-soft)] text-[var(--accent)]">
+                {tc.label}
               </span>
-            )}
-            {snap.shares && <span>{snap.shares}股</span>}
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Snapshot */}
+      {snap && (
+        <div className="flex items-center gap-3 mt-2 px-2.5 py-1.5 rounded-[var(--radius)] bg-[var(--bg-sunken)] text-[11px] text-[var(--ink-faint)]">
+          <span>存证价 <span className="font-mono font-medium text-[var(--ink)]">{parseFloat(snap.currentPrice).toFixed(2)}</span></span>
+          {snap.pnlPct && (
+            <span className={parseFloat(snap.pnlPct) >= 0 ? 'text-positive' : 'text-negative'}>
+              {formatPnl(parseFloat(snap.pnlPct))}
+            </span>
+          )}
+          {snap.shares && <span>{snap.shares}股</span>}
+        </div>
+      )}
     </div>
   );
 }

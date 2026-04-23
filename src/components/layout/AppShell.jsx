@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, createContext, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
-import { Plus, ArrowUpDown, RefreshCw, Download, Upload, TrendingUp, ClipboardCheck, LogOut } from 'lucide-react';
+import { Plus, ArrowUpDown, RefreshCw, Download, Upload, ClipboardCheck, LogOut } from 'lucide-react';
+import { Logo, Wordmark } from '../ui/Logo';
 
 // 沉浸写作模式 context
 export const ImmersiveContext = createContext({ immersive: false, setImmersive: () => {} });
@@ -89,8 +90,7 @@ function MobileTopNav() {
     <header className="sticky top-0 z-10 bg-bg/80 backdrop-blur-sm border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 text-text no-underline">
-          <TrendingUp size={20} className="text-accent" />
-          <span className="font-semibold text-base tracking-tight">Follow</span>
+          <Wordmark />
         </Link>
         <div className="flex items-center gap-2.5">
           <Link to="/review" className="text-text-tertiary hover:text-text p-2 rounded-lg hover:bg-surface-hover transition-colors" title="复盘">
@@ -153,58 +153,67 @@ function StockListPanel({ width }) {
     );
   }
 
+  const tabs = [
+    { key: 'all', label: '全部', count: stocks.length },
+    { key: 'holding', label: '持仓', count: stocks.filter(s => s.status === 'holding').length },
+    { key: 'watching', label: '观察', count: stocks.filter(s => s.status === 'watching').length },
+    { key: 'closed', label: '已清仓', count: stocks.filter(s => s.status === 'closed').length },
+  ];
+
   return (
-    <div style={{ width }} className="border-r border-border bg-surface/50 overflow-y-auto shrink-0 flex flex-col">
+    <div style={{ width }} className="border-r border-[var(--line)] bg-[var(--bg)] overflow-hidden shrink-0 flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 bg-surface/80 backdrop-blur-sm z-10 px-4 pt-4 pb-2 border-b border-border-light">
+      <div className="px-5 pt-5 pb-3.5 flex flex-col gap-3.5 border-b border-[var(--line)]">
         {/* Title + Add */}
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-base font-semibold">组合总览</h1>
+        <div className="flex items-baseline justify-between">
+          <div>
+            <div className="text-[11px] tracking-widest uppercase text-[var(--ink-faint)]">My Portfolio</div>
+            <h2 className="font-serif text-[22px] font-semibold tracking-tight leading-tight">组合总览</h2>
+          </div>
           <button onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent-hover transition-colors">
-            <Plus size={14} /> 添加
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer"
+            style={{ background: 'var(--ink)', color: 'var(--bg)' }}>
+            <Plus size={12} /> 添加
           </button>
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex items-center gap-1 mb-2">
-          {[
-            { key: 'all', label: '全部' },
-            { key: 'holding', label: '持仓' },
-            { key: 'watching', label: '观察' },
-            { key: 'closed', label: '已清仓' },
-          ].map(f => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-2 py-1 rounded-md text-xs transition-colors ${
-                filter === f.key ? 'bg-accent-light text-accent font-medium' : 'text-text-secondary hover:bg-surface-hover'
-              }`}>
-              {f.label}
+        {/* Pill tabs with counts */}
+        <div className="flex gap-0.5 text-[13px]">
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => setFilter(t.key)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors cursor-pointer border-0"
+              style={filter === t.key
+                ? { background: 'var(--ink)', color: 'var(--bg)' }
+                : { background: 'transparent', color: 'var(--ink-soft)' }
+              }>
+              {t.label}
+              <span className={`text-[11px] font-mono ${filter === t.key ? 'opacity-70' : 'opacity-60'}`}>{t.count}</span>
             </button>
           ))}
         </div>
 
         {/* Sort + actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-0.5 text-text-tertiary">
+        <div className="flex items-center justify-between text-xs text-[var(--ink-faint)]">
+          <div className="flex items-center gap-1 cursor-pointer">
             <ArrowUpDown size={12} />
             <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-              className="text-xs bg-transparent border-none outline-none cursor-pointer text-text-secondary py-0.5">
+              className="bg-transparent border-none outline-none cursor-pointer text-[var(--ink-faint)] text-xs py-0.5">
               <option value="updated">最近活跃</option>
               <option value="pnl">按盈亏</option>
               <option value="name">按名称</option>
             </select>
           </div>
-          <div className="flex items-center gap-0.5">
+          <div className="inline-flex gap-0.5">
             <button onClick={handleRefresh} disabled={refreshing} title="刷新行情"
-              className="text-text-tertiary hover:text-text-secondary p-1.5 rounded-md hover:bg-surface-hover transition-colors disabled:opacity-40">
+              className="w-[26px] h-[26px] grid place-items-center rounded-md bg-transparent border-0 text-[var(--ink-faint)] hover:bg-[var(--bg-sunken)] hover:text-[var(--ink)] transition-colors cursor-pointer disabled:opacity-40">
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
             </button>
             <button onClick={handleExport} title="导出数据"
-              className="text-text-tertiary hover:text-text-secondary p-1.5 rounded-md hover:bg-surface-hover transition-colors">
+              className="w-[26px] h-[26px] grid place-items-center rounded-md bg-transparent border-0 text-[var(--ink-faint)] hover:bg-[var(--bg-sunken)] hover:text-[var(--ink)] transition-colors cursor-pointer">
               <Download size={14} />
             </button>
             <button onClick={() => fileInputRef.current?.click()} title="导入数据"
-              className="text-text-tertiary hover:text-text-secondary p-1.5 rounded-md hover:bg-surface-hover transition-colors">
+              className="w-[26px] h-[26px] grid place-items-center rounded-md bg-transparent border-0 text-[var(--ink-faint)] hover:bg-[var(--bg-sunken)] hover:text-[var(--ink)] transition-colors cursor-pointer">
               <Upload size={14} />
             </button>
             <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
@@ -213,11 +222,11 @@ function StockListPanel({ width }) {
       </div>
 
       {/* Stock list */}
-      <div className="flex-1 overflow-y-auto px-3 py-3">
+      <div className="flex-1 overflow-y-auto px-2.5 py-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[var(--line)]">
         {filtered.length === 0 ? (
           <div className="text-center py-12">
-            <div className="w-10 h-10 rounded-full bg-surface-hover flex items-center justify-center mx-auto mb-3">
-              <TrendingUp size={20} className="text-text-tertiary" />
+            <div className="w-10 h-10 rounded-full bg-surface-hover flex items-center justify-center mx-auto mb-3 text-text-tertiary">
+              <Logo size={20} />
             </div>
             <p className="text-sm text-text-secondary mb-1">
               {stocks.length === 0 ? '还没有添加股票' : '这个分类下没有股票'}
@@ -239,7 +248,7 @@ function StockListPanel({ width }) {
             )}
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-0.5">
             {filtered.map(stock => (
               <StockCard
                 key={stock.id}

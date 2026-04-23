@@ -1,17 +1,18 @@
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatMoney, formatPnl, CHART_COLORS } from '../../utils';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatMoney, formatPnl } from '../../utils';
 
-const CustomTooltip = ({ active, payload, label, formatter, suffix = '' }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-text text-white text-xs rounded-lg px-3 py-2 shadow-lg">
-      <p className="font-medium mb-0.5">{label || payload[0]?.name}</p>
-      <p>{formatter ? formatter(payload[0].value) : `${payload[0].value}${suffix}`}</p>
-    </div>
-  );
-};
-
-const CASH_COLOR = '#94a3b8'; // slate-400
+// Design-system–aligned palette
+const CHART_COLORS = [
+  'oklch(0.58 0.14 38)',   // terracotta (accent)
+  'oklch(0.70 0.08 230)',  // sky
+  'oklch(0.60 0.10 300)',  // violet
+  'oklch(0.55 0.10 155)',  // sage
+  'oklch(0.72 0.12 80)',   // gold
+  'oklch(0.58 0.13 25)',   // dusty rose
+  'oklch(0.50 0.12 280)',  // deep violet
+  'oklch(0.65 0.08 200)',  // teal
+];
+const CASH_COLOR = 'oklch(0.62 0.015 65)'; // ink-faint tone
 
 export default function PortfolioCharts({ holdingStocks, cashBalance = '' }) {
   // Calculate summary stats
@@ -35,10 +36,9 @@ export default function PortfolioCharts({ holdingStocks, cashBalance = '' }) {
   const totalAbsCost = Math.abs(totalCost);
   const totalPnlPct = totalAbsCost > 0 ? (totalPnl / totalAbsCost * 100) : 0;
 
-  // Chart data
+  // Pie data
   const pieData = [];
-  const pnlAmountData = [];
-  const pnlPctData = [];
+  const pnlBarData = [];
   holdingStocks.forEach(s => {
     const current = parseFloat(s.currentPrice);
     const shares = parseFloat(s.shares);
@@ -47,132 +47,161 @@ export default function PortfolioCharts({ holdingStocks, cashBalance = '' }) {
       pieData.push({ name: s.name, value: Math.round(current * shares) });
     }
     if (!isNaN(cost) && !isNaN(current) && !isNaN(shares) && cost !== 0 && shares > 0) {
-      pnlAmountData.push({ name: s.name, pnl: Math.round((current - cost) * shares) });
-      pnlPctData.push({ name: s.name, pct: +((current - cost) / Math.abs(cost) * 100).toFixed(2) });
+      const pnl = (current - cost) * shares;
+      pnlBarData.push({ name: s.name, val: pnl / 10000 }); // 万
     }
   });
-  pnlAmountData.sort((a, b) => b.pnl - a.pnl);
-  pnlPctData.sort((a, b) => b.pct - a.pct);
+  pnlBarData.sort((a, b) => b.val - a.val);
 
-  // 现金仓位加入饼图
   const cashNum = parseFloat(cashBalance);
   const hasCash = !isNaN(cashNum) && cashNum > 0;
   if (hasCash) {
     pieData.push({ name: '现金', value: Math.round(cashNum), isCash: true });
   }
-
   const pieTotal = pieData.reduce((sum, d) => sum + d.value, 0);
+  const totalAssets = totalMarketValue + (hasCash ? cashNum : 0);
+
+  // Max absolute bar value for scaling
+  const maxBar = Math.max(...pnlBarData.map(b => Math.abs(b.val)), 0.01);
+
+  const watchCount = holdingStocks.length; // already filtered to holding
 
   return (
-    <div className="lg:sticky lg:top-20 lg:self-start flex flex-col gap-4">
-      {/* Stats cards */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-surface rounded-xl border border-border p-2.5">
-          <p className="text-xs text-text-tertiary mb-1">持仓</p>
-          <p className="text-lg font-semibold">{holdingStocks.length}</p>
-        </div>
-        <div className="bg-surface rounded-xl border border-border p-2.5">
-          <p className="text-xs text-text-tertiary mb-1">总资产</p>
-          <p className="text-lg font-semibold truncate">
-            {hasPnlData || hasCash ? formatMoney(totalMarketValue + (hasCash ? cashNum : 0)) : '—'}
-          </p>
-          {hasPnlData && hasCash && (
-            <p className="text-xs text-text-tertiary">持仓 {formatMoney(totalMarketValue)}</p>
-          )}
-        </div>
-        <div className="bg-surface rounded-xl border border-border p-2.5">
-          <p className="text-xs text-text-tertiary mb-1">总盈亏</p>
-          {hasPnlData ? (
-            <div>
-              <p className={`text-lg font-semibold truncate ${totalPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {totalPnl >= 0 ? '+' : ''}{formatMoney(totalPnl)}
-              </p>
-              <p className={`text-xs ${totalPnlPct >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {formatPnl(totalPnlPct)}
-              </p>
-            </div>
-          ) : (
-            <p className="text-lg font-semibold">—</p>
-          )}
-        </div>
+    <div className="flex flex-col gap-5">
+      {/* Stat grid */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="持仓数" value={holdingStocks.length} />
+        <StatCard
+          label="总资产"
+          value={hasPnlData || hasCash ? formatAssetVal(totalAssets) : '—'}
+          sub={hasPnlData && hasCash ? `持仓 ${formatMoney(totalMarketValue)} · 现金 ${formatMoney(cashNum)}` : null}
+        />
+        <StatCard
+          label="总盈亏"
+          value={hasPnlData ? formatAssetVal(totalPnl, true) : '—'}
+          valueClass={hasPnlData ? (totalPnl >= 0 ? 'text-positive' : 'text-negative') : ''}
+          sub={hasPnlData ? `${formatPnl(totalPnlPct)} 全周期` : null}
+          subClass={hasPnlData ? (totalPnlPct >= 0 ? 'text-positive' : 'text-negative') : ''}
+        />
       </div>
 
-      {/* Pie chart: position distribution */}
+      {/* Donut chart card */}
       {pieData.length > 0 && (
-        <div className="bg-surface rounded-xl border border-border p-4">
-          <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">持仓分布</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                outerRadius={75} innerRadius={40} paddingAngle={2} stroke="none">
-                {pieData.map((d, i) => (
-                  <Cell key={i} fill={d.isCash ? CASH_COLOR : CHART_COLORS[i % CHART_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip content={({ active, payload }) => {
-                if (!active || !payload?.length) return null;
-                const { name, value } = payload[0].payload;
-                const pct = pieTotal > 0 ? (value / pieTotal * 100).toFixed(1) : 0;
+        <section className="bg-[var(--bg-raised)] border border-[var(--line)] rounded-[var(--radius-lg)] p-5">
+          <div className="flex items-baseline justify-between mb-4">
+            <div className="font-serif text-base font-semibold tracking-tight">持仓分布</div>
+            <div className="text-[11.5px] text-[var(--ink-faint)]">按市值占比</div>
+          </div>
+          <div className="grid grid-cols-[auto_1fr] gap-9 items-center">
+            <ResponsiveContainer width={160} height={160}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                  outerRadius={75} innerRadius={45} paddingAngle={2} stroke="none">
+                  {pieData.map((d, i) => (
+                    <Cell key={i} fill={d.isCash ? CASH_COLOR : CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const { name, value } = payload[0].payload;
+                  const pct = pieTotal > 0 ? (value / pieTotal * 100).toFixed(1) : 0;
+                  return (
+                    <div className="text-xs rounded-lg px-3 py-2 shadow-lg" style={{ background: 'var(--ink)', color: 'var(--bg)' }}>
+                      <p className="font-medium mb-0.5">{name}</p>
+                      <p>{formatMoney(value)}（{pct}%）</p>
+                    </div>
+                  );
+                }} />
+              </PieChart>
+            </ResponsiveContainer>
+            {/* Legend grid */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12.5px]">
+              {pieData.map((d, i) => {
+                const pct = pieTotal > 0 ? (d.value / pieTotal * 100).toFixed(1) : '0';
                 return (
-                  <div className="bg-text text-white text-xs rounded-lg px-3 py-2 shadow-lg">
-                    <p className="font-medium mb-0.5">{name}</p>
-                    <p>{formatMoney(value)}（{pct}%）</p>
+                  <div key={d.name} className="flex items-center gap-2 text-[var(--ink-soft)]">
+                    <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: d.isCash ? CASH_COLOR : CHART_COLORS[i % CHART_COLORS.length] }} />
+                    <span className="flex-1 text-[var(--ink)]">{d.name}</span>
+                    <span className="font-mono text-[var(--ink-faint)]">{pct}%</span>
                   </div>
                 );
-              }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-            {pieData.map((d, i) => {
-              const pct = pieTotal > 0 ? (d.value / pieTotal * 100).toFixed(1) : 0;
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* P&L bar chart (CSS bars, center-axis) */}
+      {pnlBarData.length > 0 && (
+        <section className="bg-[var(--bg-raised)] border border-[var(--line)] rounded-[var(--radius-lg)] p-5">
+          <div className="flex items-baseline justify-between mb-4">
+            <div className="font-serif text-base font-semibold tracking-tight">个股盈亏金额</div>
+            <div className="text-[11.5px] text-[var(--ink-faint)]">单位：万元</div>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {pnlBarData.map(b => {
+              const isGain = b.val >= 0;
+              const widthPct = (Math.abs(b.val) / maxBar) * 50;
               return (
-                <span key={d.name} className="flex items-center gap-1 text-xs text-text-secondary">
-                  <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: d.isCash ? CASH_COLOR : CHART_COLORS[i % CHART_COLORS.length] }} />
-                  {d.name} {pct}%
-                </span>
+                <div key={b.name} className="grid items-center gap-3 text-[12.5px]" style={{ gridTemplateColumns: '70px 1fr 60px' }}>
+                  <div className="font-serif text-right text-[13px] text-[var(--ink)]">{b.name}</div>
+                  <div className="relative h-6 bg-[var(--bg-sunken)] rounded-sm flex">
+                    {/* Center axis */}
+                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[var(--line-strong)] opacity-50" />
+                    {isGain ? (
+                      <div
+                        className="h-full rounded-sm transition-[width] duration-400"
+                        style={{
+                          marginLeft: '50%',
+                          width: `${widthPct}%`,
+                          background: `linear-gradient(90deg, color-mix(in oklch, var(--gain) 60%, transparent), var(--gain))`,
+                        }}
+                      />
+                    ) : (
+                      <div
+                        className="h-full rounded-sm transition-[width] duration-400"
+                        style={{
+                          marginLeft: `${50 - widthPct}%`,
+                          width: `${widthPct}%`,
+                          background: `linear-gradient(90deg, var(--loss), color-mix(in oklch, var(--loss) 60%, transparent))`,
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className={`font-mono text-xs ${isGain ? 'text-positive' : 'text-negative'}`}>
+                    {isGain ? '+' : ''}{b.val.toFixed(2)}
+                  </div>
+                </div>
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* Bar chart: per-stock P&L amount */}
-      {pnlAmountData.length > 0 && (
-        <div className="bg-surface rounded-xl border border-border p-4">
-          <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">个股盈亏金额</h3>
-          <ResponsiveContainer width="100%" height={Math.max(120, pnlAmountData.length * 32)}>
-            <BarChart data={pnlAmountData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
-              <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => formatMoney(v)} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={64} />
-              <Tooltip content={<CustomTooltip formatter={formatMoney} />} />
-              <Bar dataKey="pnl" radius={[0, 6, 6, 0]}>
-                {pnlAmountData.map((d, i) => (
-                  <Cell key={i} fill={d.pnl >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Bar chart: per-stock P&L percentage */}
-      {pnlPctData.length > 0 && (
-        <div className="bg-surface rounded-xl border border-border p-4">
-          <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-3">个股收益率</h3>
-          <ResponsiveContainer width="100%" height={Math.max(120, pnlPctData.length * 32)}>
-            <BarChart data={pnlPctData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
-              <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={64} />
-              <Tooltip content={<CustomTooltip suffix="%" />} />
-              <Bar dataKey="pct" radius={[0, 6, 6, 0]}>
-                {pnlPctData.map((d, i) => (
-                  <Cell key={i} fill={d.pct >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        </section>
       )}
     </div>
   );
+}
+
+// ─── Helpers ───
+
+function StatCard({ label, value, sub, valueClass = '', subClass = '' }) {
+  return (
+    <div className="p-4 bg-[var(--bg-raised)] border border-[var(--line)] rounded-[var(--radius)] flex flex-col gap-1">
+      <div className="text-[11px] tracking-widest uppercase text-[var(--ink-faint)]">{label}</div>
+      <div className={`font-mono text-[28px] font-medium tracking-tight leading-tight mt-1 ${valueClass}`}>
+        {value}
+      </div>
+      {sub && <div className={`text-xs font-mono text-[var(--ink-faint)] ${subClass}`}>{sub}</div>}
+    </div>
+  );
+}
+
+function formatAssetVal(num, showSign = false) {
+  const abs = Math.abs(num);
+  if (abs >= 10000) {
+    const wan = num / 10000;
+    const prefix = showSign && num > 0 ? '+' : '';
+    return `${prefix}${wan.toFixed(2)}万`;
+  }
+  const prefix = showSign && num > 0 ? '+' : '';
+  return `${prefix}${num.toFixed(0)}`;
 }

@@ -1,6 +1,7 @@
 import { useContext } from 'react';
 import { Outlet, Link } from 'react-router-dom';
-import { TrendingUp, LogOut, ClipboardCheck, Settings, HardDrive, Cloud, Key } from 'lucide-react';
+import { LogOut, ClipboardCheck, Settings, HardDrive, Cloud, Key } from 'lucide-react';
+import { Wordmark } from '../ui/Logo';
 import { useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { isTauri, getStorageMode, setStorageMode } from '../../store';
@@ -35,8 +36,7 @@ export default function Layout() {
       <header className="sticky top-0 z-10 bg-bg/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 text-text no-underline">
-            <TrendingUp size={20} className="text-accent" />
-            <span className="font-semibold text-base tracking-tight">Follow</span>
+            <Wordmark />
             {isTauri && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-text-tertiary font-normal">
                 {isLocal ? '本地' : '云端'}

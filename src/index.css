@@ -1,33 +1,155 @@
+/* ============================================================
+   FollowMind — Design System (Warm Editorial)
+   Three themes: Warm Paper (default) / Midnight Journal / Kraft Card
+   A股习惯: 红涨绿跌 (gain=dusty rose, loss=muted sage)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @import "tailwindcss";
 
-@theme {
-  --color-bg: #fafaf9;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f5f5f4;
-  --color-border: #e7e5e4;
-  --color-border-light: #f0eeec;
-  --color-text: #1c1917;
-  --color-text-secondary: #78716c;
-  --color-text-tertiary: #a8a29e;
-  --color-accent: #4f46e5;
-  --color-accent-light: #eef2ff;
-  --color-accent-hover: #4338ca;
-  --color-positive: #f43f5e;
-  --color-positive-light: #fff1f2;
-  --color-negative: #10b981;
-  --color-negative-light: #ecfdf5;
-  --color-warning: #d97706;
-  --color-warning-light: #fffbeb;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'SF Mono', 'Fira Code', monospace;
+/* ---------- Theme: Warm Paper (default) ---------- */
+:root, .theme-paper {
+  --bg: oklch(0.975 0.012 80);
+  --bg-raised: oklch(0.99 0.008 80);
+  --bg-sunken: oklch(0.955 0.015 75);
+  --bg-card: oklch(1 0 0 / 0.6);
+  --line: oklch(0.88 0.015 75);
+  --line-strong: oklch(0.78 0.02 70);
+  --ink: oklch(0.22 0.025 60);
+  --ink-soft: oklch(0.42 0.02 60);
+  --ink-faint: oklch(0.62 0.015 65);
+  --accent: oklch(0.58 0.14 38);
+  --accent-soft: oklch(0.92 0.04 38);
+  /* A股: 红涨(gain=dusty rose) 绿跌(loss=sage) */
+  --gain: oklch(0.58 0.13 25);
+  --gain-soft: oklch(0.93 0.04 25);
+  --loss: oklch(0.55 0.10 155);
+  --loss-soft: oklch(0.92 0.04 155);
+  --gold: oklch(0.72 0.12 80);
+  --sky: oklch(0.70 0.08 230);
+  --violet: oklch(0.60 0.10 300);
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.6) inset,
+                 0 1px 2px oklch(0.2 0.02 60 / 0.04),
+                 0 4px 16px oklch(0.2 0.02 60 / 0.04);
+  --serif: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+  --sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
 }
 
+/* ---------- Theme: Midnight Journal ---------- */
+.theme-midnight {
+  --bg: oklch(0.20 0.015 60);
+  --bg-raised: oklch(0.24 0.018 60);
+  --bg-sunken: oklch(0.17 0.012 60);
+  --bg-card: oklch(0.27 0.02 60 / 0.6);
+  --line: oklch(0.32 0.02 60);
+  --line-strong: oklch(0.42 0.025 60);
+  --ink: oklch(0.94 0.012 80);
+  --ink-soft: oklch(0.75 0.015 75);
+  --ink-faint: oklch(0.55 0.018 70);
+  --accent: oklch(0.75 0.12 50);
+  --accent-soft: oklch(0.35 0.06 50);
+  /* A股: 红涨绿跌 (swapped from design's US convention) */
+  --gain: oklch(0.72 0.13 25);
+  --gain-soft: oklch(0.32 0.06 25);
+  --loss: oklch(0.75 0.12 155);
+  --loss-soft: oklch(0.32 0.05 155);
+  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.04) inset,
+                 0 4px 24px oklch(0 0 0 / 0.3);
+}
+
+/* ---------- Theme: Kraft Card ---------- */
+.theme-kraft {
+  --bg: oklch(0.88 0.035 75);
+  --bg-raised: oklch(0.94 0.025 75);
+  --bg-sunken: oklch(0.84 0.04 75);
+  --bg-card: oklch(0.96 0.018 75);
+  --line: oklch(0.72 0.04 65);
+  --line-strong: oklch(0.58 0.05 60);
+  --ink: oklch(0.25 0.03 55);
+  --ink-soft: oklch(0.42 0.025 60);
+  --ink-faint: oklch(0.58 0.02 65);
+  --accent: oklch(0.48 0.14 30);
+  --accent-soft: oklch(0.86 0.06 30);
+  /* A股: 红涨绿跌 (swapped from design's US convention) */
+  --gain: oklch(0.52 0.14 25);
+  --gain-soft: oklch(0.85 0.07 25);
+  --loss: oklch(0.48 0.10 150);
+  --loss-soft: oklch(0.85 0.06 150);
+}
+
+/* ---------- Tailwind theme tokens ----------
+   Maps design-system CSS vars → Tailwind utility classes.
+   Existing classes like bg-bg, text-text, text-positive etc. keep working,
+   but now respond to theme switching via CSS custom properties.
+   ------------------------------------------ */
+@theme {
+  /* Backgrounds */
+  --color-bg: var(--bg);
+  --color-surface: var(--bg-raised);
+  --color-surface-hover: var(--bg-sunken);
+
+  /* Borders */
+  --color-border: var(--line);
+  --color-border-light: var(--line);
+
+  /* Text */
+  --color-text: var(--ink);
+  --color-text-secondary: var(--ink-soft);
+  --color-text-tertiary: var(--ink-faint);
+
+  /* Accent */
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-soft);
+  --color-accent-hover: var(--accent);
+
+  /* Gain/Loss (A股: positive=红涨, negative=绿跌) */
+  --color-positive: var(--gain);
+  --color-positive-light: var(--gain-soft);
+  --color-negative: var(--loss);
+  --color-negative-light: var(--loss-soft);
+
+  /* Utility */
+  --color-warning: var(--gold);
+  --color-warning-light: oklch(0.95 0.04 80);
+
+  /* Fonts */
+  --font-sans: var(--sans);
+  --font-serif: var(--serif);
+  --font-mono: var(--mono);
+}
 
 body {
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
   font-variant-numeric: tabular-nums;
   line-height: 1.625;
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01', 'cv11';
+  letter-spacing: -0.005em;
 }
+
+/* ─── Utility classes for CSS-var colors ─── */
+/* Tailwind v4 can't resolve var() inside bg-[...] at build time,
+   so we define these as real utility classes. */
+.bg-ink { background: var(--ink); }
+.text-ink { color: var(--ink); }
+.bg-bg { background: var(--bg); }
+.text-bg { color: var(--bg); }
+.bg-ink-soft { background: var(--ink-soft); }
+.bg-bg-raised { background: var(--bg-raised); }
+.bg-bg-sunken { background: var(--bg-sunken); }
+.bg-accent-var { background: var(--accent); }
+.bg-accent-soft-var { background: var(--accent-soft); }
+.text-accent-var { color: var(--accent); }
+.text-ink-faint { color: var(--ink-faint); }
+.text-ink-soft { color: var(--ink-soft); }
+.border-line { border-color: var(--line); }
+
+/* Modal animations */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn { from { transform: translateY(10px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
