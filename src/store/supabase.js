@@ -445,6 +445,49 @@ export async function importData(jsonStr) {
   }
 }
 
+// ── Journal (独立写作) ──
+
+export async function getJournals() {
+  const { data, error } = await supabase
+    .from('journals')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(mapJournal);
+}
+
+export async function addJournal({ title, content, tags = [] }) {
+  const row = { title, content };
+  if (tags.length > 0) row.tags = tags;
+  const { data, error } = await supabase
+    .from('journals')
+    .insert(row)
+    .select()
+    .single();
+  if (error) throw error;
+  return mapJournal(data);
+}
+
+export async function updateJournal(id, updates) {
+  const dbUpdates = { updated_at: new Date().toISOString() };
+  if (updates.title !== undefined) dbUpdates.title = updates.title;
+  if (updates.content !== undefined) dbUpdates.content = updates.content;
+  if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
+  const { data, error } = await supabase
+    .from('journals')
+    .update(dbUpdates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return mapJournal(data);
+}
+
+export async function deleteJournal(id) {
+  const { error } = await supabase.from('journals').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // ── Field mapping helpers (snake_case DB → camelCase JS) ──
 
 function mapStock(row) {
@@ -489,5 +532,16 @@ function mapEntry(row) {
     logicTags: row.logic_tags || null,
     reviewVerdict: row.review_verdict || null,
     createdAt: row.created_at,
+  };
+}
+
+function mapJournal(row) {
+  return {
+    id: row.id,
+    title: row.title || '',
+    content: row.content || '',
+    tags: row.tags || [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }

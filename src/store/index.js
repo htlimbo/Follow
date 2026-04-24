@@ -66,6 +66,11 @@ export const {
   // Portfolio settings
   getCashBalance,
   setCashBalance,
+  // Journal
+  getJournals,
+  addJournal,
+  updateJournal,
+  deleteJournal,
   // Export / Import
   exportData,
   importData,

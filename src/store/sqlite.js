@@ -93,6 +93,16 @@ async function initTables() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_price_history_stock_date
     ON price_history (stock_id, recorded_at)
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS journals (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      tags TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
   // 开启外键约束（SQLite 默认关闭）
   await db.execute('PRAGMA foreign_keys = ON');
 }
@@ -505,6 +515,63 @@ export async function setCashBalance(amount) {
       [uuid(), amount, ts, ts]
     );
   }
+}
+
+// ── Journal (独立写作) ──
+
+export async function getJournals() {
+  const d = await getDb();
+  const rows = await d.select('SELECT * FROM journals ORDER BY created_at DESC');
+  return rows.map(mapJournal);
+}
+
+export async function addJournal({ title, content, tags = [] }) {
+  const d = await getDb();
+  const id = uuid();
+  const ts = now();
+  const tagsJson = tags.length > 0 ? JSON.stringify(tags) : null;
+  await d.execute(
+    `INSERT INTO journals (id, title, content, tags, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, title, content, tagsJson, ts, ts]
+  );
+  const rows = await d.select('SELECT * FROM journals WHERE id = $1', [id]);
+  return mapJournal(rows[0]);
+}
+
+export async function updateJournal(id, updates) {
+  const d = await getDb();
+  const sets = [];
+  const vals = [];
+  let idx = 1;
+  if (updates.title !== undefined) { sets.push(`title = $${idx}`); vals.push(updates.title); idx++; }
+  if (updates.content !== undefined) { sets.push(`content = $${idx}`); vals.push(updates.content); idx++; }
+  if (updates.tags !== undefined) { sets.push(`tags = $${idx}`); vals.push(JSON.stringify(updates.tags)); idx++; }
+  sets.push(`updated_at = $${idx}`); vals.push(now()); idx++;
+  vals.push(id);
+  await d.execute(`UPDATE journals SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
+  const rows = await d.select('SELECT * FROM journals WHERE id = $1', [id]);
+  return mapJournal(rows[0]);
+}
+
+export async function deleteJournal(id) {
+  const d = await getDb();
+  await d.execute('DELETE FROM journals WHERE id = $1', [id]);
+}
+
+function mapJournal(row) {
+  let tags = [];
+  if (row.tags) {
+    try { tags = JSON.parse(row.tags); } catch { tags = []; }
+  }
+  return {
+    id: row.id,
+    title: row.title || '',
+    content: row.content || '',
+    tags,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 // ── Export / Import ──

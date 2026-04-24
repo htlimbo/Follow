@@ -8,6 +8,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import Portfolio from './pages/Portfolio';
 import StockDetail from './pages/StockDetail';
 import Review from './pages/Review';
+import Journal from './pages/Journal';
 import Activation from './pages/Activation';
 import { isTauri } from './store';
 
@@ -67,6 +68,7 @@ export default function App() {
                     <Route path="/" element={<Portfolio />} />
                     <Route path="/stock/:id" element={<StockDetail />} />
                     <Route path="/review" element={<Review />} />
+                    <Route path="/journal" element={<Journal />} />
                   </Route>
                 </Routes>
               </StockDataProvider>

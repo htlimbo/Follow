@@ -76,38 +76,49 @@ export default function Review() {
   const wrong = entries.filter(e => e.reviewVerdict === 'wrong').length;
 
   return (
-    <div>
+    <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Link to="/" className="text-text-tertiary hover:text-text p-1 rounded-lg hover:bg-surface-hover transition-colors">
-          <ArrowLeft size={18} />
-        </Link>
-        <h1 className="text-xl font-semibold">判断记分卡</h1>
+      <div className="pb-5 border-b" style={{ borderColor: 'var(--line)' }}>
+        <div className="text-[11px] tracking-[0.14em] uppercase mb-1" style={{ color: 'var(--ink-faint)' }}>
+          Post-Mortem Review
+        </div>
+        <div className="flex items-center gap-3">
+          <h1 className="font-serif text-[26px] font-semibold tracking-tight">阶段复盘</h1>
+        </div>
+        <div className="mt-1.5 text-[13px]" style={{ color: 'var(--ink-soft)' }}>
+          回顾判断，审视纪律，与过去的自己对话。
+        </div>
       </div>
 
       {/* Period selector */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
+      <div className="flex flex-wrap items-center gap-1.5 mt-5 mb-6">
         {PERIOD_OPTIONS.map(p => (
           <button key={p.label} onClick={() => { setPeriod(p); setCustomMode(false); }}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              !customMode && period.label === p.label ? 'bg-accent-light text-accent font-medium' : 'text-text-secondary hover:bg-surface-hover'
-            }`}>
+            className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer border-0"
+            style={!customMode && period.label === p.label
+              ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+              : { background: 'transparent', color: 'var(--ink-soft)' }
+            }>
             {p.label}
           </button>
         ))}
         <button onClick={() => setCustomMode(true)}
-          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-            customMode ? 'bg-accent-light text-accent font-medium' : 'text-text-secondary hover:bg-surface-hover'
-          }`}>
+          className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer border-0"
+          style={customMode
+            ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+            : { background: 'transparent', color: 'var(--ink-soft)' }
+          }>
           自定义
         </button>
         {customMode && (
           <div className="flex items-center gap-2">
             <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg border border-border text-sm focus:outline-none focus:border-accent" />
-            <span className="text-text-tertiary text-sm">至</span>
+              className="px-2.5 py-1.5 rounded-[var(--radius)] border text-sm font-mono focus:outline-none"
+              style={{ borderColor: 'var(--line)', background: 'var(--bg)' }} />
+            <span className="text-sm" style={{ color: 'var(--ink-faint)' }}>至</span>
             <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg border border-border text-sm focus:outline-none focus:border-accent" />
+              className="px-2.5 py-1.5 rounded-[var(--radius)] border text-sm font-mono focus:outline-none"
+              style={{ borderColor: 'var(--line)', background: 'var(--bg)' }} />
           </div>
         )}
       </div>
@@ -116,17 +127,17 @@ export default function Review() {
         <ReviewSkeleton />
       ) : entries.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-text-secondary mb-1">这个时间段没有关键判断记录</p>
-          <p className="text-sm text-text-tertiary">买入、卖出、修正判断类型的记录会出现在这里</p>
+          <p className="font-serif text-sm" style={{ color: 'var(--ink-soft)' }}>这个时间段没有关键判断记录</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--ink-faint)' }}>买入、卖出、修正判断类型的记录会出现在这里</p>
         </div>
       ) : (
         <>
-          {/* Summary */}
-          <div className="flex items-center gap-4 mb-5 text-sm">
-            <span className="text-text-secondary">共 {entries.length} 条关键判断</span>
-            {confirmed > 0 && <span className="text-positive flex items-center gap-1"><CheckCircle size={14} /> {confirmed} 兑现</span>}
-            {pending > 0 && <span className="text-warning flex items-center gap-1"><Clock size={14} /> {pending} 验证中</span>}
-            {wrong > 0 && <span className="text-negative flex items-center gap-1"><XCircle size={14} /> {wrong} 打脸</span>}
+          {/* Summary stats */}
+          <div className="flex items-center gap-5 mb-5 text-xs">
+            <span style={{ color: 'var(--ink-soft)' }}>共 <span className="font-mono font-medium">{entries.length}</span> 条关键判断</span>
+            {confirmed > 0 && <span className="text-positive flex items-center gap-1"><CheckCircle size={13} /> {confirmed} 逻辑证实</span>}
+            {pending > 0 && <span className="flex items-center gap-1" style={{ color: 'var(--gold)' }}><Clock size={13} /> {pending} 待验证</span>}
+            {wrong > 0 && <span className="text-negative flex items-center gap-1"><XCircle size={13} /> {wrong} 逻辑证伪</span>}
           </div>
 
           {/* Entry list */}
