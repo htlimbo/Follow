@@ -22,7 +22,7 @@ FollowMind 是一个面向 A 股 + 港股个人投资者的研究与持仓管理
 - 迷你走势图（Sparkline）展示近期价格趋势
 - 数据导入导出（JSON 备份），一键迁移
 
-![组合总览](docs/screenshots/portfolio.png)
+![组合总览](docs/screenshots/home.png)
 
 ### 个股研究卡片
 
