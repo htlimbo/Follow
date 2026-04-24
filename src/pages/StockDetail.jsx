@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Trash2, Plus, Brain, Edit3 } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, Brain, Edit3, ShoppingCart, LogOut } from 'lucide-react';
 import ResizeHandle from '../components/ui/ResizeHandle';
 import Sparkline from '../components/ui/Sparkline';
 import {
@@ -38,6 +38,7 @@ export default function StockDetail() {
   const [stock, setStock] = useState(null);
   const [entries, setEntries] = useState([]);
   const [showAddEntry, setShowAddEntry] = useState(false);
+  const [defaultEntryType, setDefaultEntryType] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [entryFilter, setEntryFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -112,10 +113,40 @@ export default function StockDetail() {
   }
 
   async function handleAddEntry(data) {
-    const entry = await addEntry({ stockId: id, ...data });
+    const { quantity, ...entryData } = data;
+    const entry = await addEntry({ stockId: id, ...entryData });
     setEntries(prev => [entry, ...prev]);
     addLocalEntry(entry);
+
+    // Auto-update position when buy/sell has price + quantity
+    const tradePrice = parseFloat(data.price);
+    const tradeQty = parseFloat(quantity);
+    if ((data.type === 'buy' || data.type === 'sell') && !isNaN(tradePrice) && !isNaN(tradeQty) && tradeQty > 0) {
+      const oldShares = parseFloat(stock.shares) || 0;
+      const oldCost = parseFloat(stock.costPrice) || 0;
+      let newShares, newCost;
+      if (data.type === 'buy') {
+        newShares = oldShares + tradeQty;
+        newCost = newShares > 0 ? (oldCost * oldShares + tradePrice * tradeQty) / newShares : tradePrice;
+      } else {
+        newShares = Math.max(0, oldShares - tradeQty);
+        newCost = oldCost; // 卖出不改变成本价
+      }
+      const updates = {
+        shares: String(newShares),
+        costPrice: String(parseFloat(newCost.toFixed(4))),
+      };
+      // 全部卖出自动清仓
+      if (data.type === 'sell' && newShares === 0) {
+        updates.status = 'closed';
+      }
+      const updated = await updateStock(id, updates);
+      setStock(updated);
+      updateLocalStock(id, updates);
+    }
+
     setShowAddEntry(false);
+    setDefaultEntryType(null);
   }
 
   async function handleDeleteEntry(entryId) {
@@ -213,6 +244,22 @@ export default function StockDetail() {
           )}
         </div>
       )}
+
+      {/* Quick trade actions */}
+      {stock.status === 'holding' && (
+        <div className="flex gap-2 mt-4">
+          <button onClick={() => { setDefaultEntryType('buy'); setShowAddEntry(true); }}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-[var(--radius)] text-xs font-medium cursor-pointer border transition-colors"
+            style={{ borderColor: 'color-mix(in oklch, var(--gain) 40%, var(--line))', color: 'var(--gain)', background: 'var(--gain-soft)' }}>
+            <ShoppingCart size={13} /> 买入
+          </button>
+          <button onClick={() => { setDefaultEntryType('sell'); setShowAddEntry(true); }}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-[var(--radius)] text-xs font-medium cursor-pointer border transition-colors"
+            style={{ borderColor: 'color-mix(in oklch, var(--loss) 40%, var(--line))', color: 'var(--loss)', background: 'var(--loss-soft)' }}>
+            <LogOut size={13} /> 卖出
+          </button>
+        </div>
+      )}
     </>
   );
 
@@ -259,7 +306,7 @@ export default function StockDetail() {
         })}
       </div>
 
-      {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} stock={stock} />}
+      {showAddEntry && <AddEntryForm onAdd={handleAddEntry} onCancel={() => { setShowAddEntry(false); setDefaultEntryType(null); }} stock={stock} defaultType={defaultEntryType} />}
 
       {/* Timeline entries */}
       <div className="relative pl-[22px]">
@@ -312,7 +359,7 @@ export default function StockDetail() {
           <div className="font-serif text-sm font-semibold mt-7 mb-2.5">思考时间线</div>
 
           {showAddEntry ? (
-            <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddEntry(false)} stock={stock} />
+            <AddEntryForm onAdd={handleAddEntry} onCancel={() => { setShowAddEntry(false); setDefaultEntryType(null); }} stock={stock} defaultType={defaultEntryType} />
           ) : (
             <div className="bg-[var(--bg-raised)] rounded-[var(--radius-lg)] border border-[var(--line)] p-8 text-center">
               <Brain size={36} className="text-[var(--ink-faint)] mx-auto mb-3" />

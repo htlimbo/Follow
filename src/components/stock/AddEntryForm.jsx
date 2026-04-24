@@ -11,10 +11,11 @@ const ENTRY_ICONS = {
   discipline: Shield,
 };
 
-export default function AddEntryForm({ onAdd, onCancel, stock }) {
-  const [type, setType] = useState('thought');
+export default function AddEntryForm({ onAdd, onCancel, stock, defaultType }) {
+  const [type, setType] = useState(defaultType || 'thought');
   const [content, setContent] = useState('');
   const [price, setPrice] = useState('');
+  const [quantity, setQuantity] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
   const [customTag, setCustomTag] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
@@ -61,12 +62,16 @@ export default function AddEntryForm({ onAdd, onCancel, stock }) {
     e.preventDefault();
     if (!content.trim()) return;
     const data = { type, content: content.trim(), price: price.trim() };
+    if ((type === 'buy' || type === 'sell') && quantity.trim()) {
+      data.quantity = quantity.trim();
+    }
     if (selectedTags.length > 0) data.logicTags = selectedTags;
     if (snapshotEnabled) data.snapshotData = buildSnapshot();
     if (setImmersive) setImmersive(false);
     onAdd(data);
     setContent('');
     setPrice('');
+    setQuantity('');
     setType('thought');
     setSelectedTags([]);
     setSnapshotEnabled(false);
@@ -128,8 +133,14 @@ export default function AddEntryForm({ onAdd, onCancel, stock }) {
         className={`w-full px-3 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-serif leading-relaxed focus:outline-none focus:border-[var(--accent)] mb-3 ${immersive ? 'resize-y' : 'resize-none'}`} />
 
       {(type === 'buy' || type === 'sell') && (
-        <input type="text" value={price} onChange={e => setPrice(e.target.value)} placeholder="成交价格（选填）"
-          className="w-full px-3 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-mono focus:outline-none focus:border-[var(--accent)] mb-3" />
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <input type="text" value={price} onChange={e => setPrice(e.target.value)}
+            placeholder={`${type === 'buy' ? '买入' : '卖出'}价格`}
+            className="w-full px-3 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-mono focus:outline-none focus:border-[var(--accent)]" />
+          <input type="text" value={quantity} onChange={e => setQuantity(e.target.value)}
+            placeholder={`${type === 'buy' ? '买入' : '卖出'}股数`}
+            className="w-full px-3 py-2 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--bg)] text-sm font-mono focus:outline-none focus:border-[var(--accent)]" />
+        </div>
       )}
 
       {/* Logic tags */}

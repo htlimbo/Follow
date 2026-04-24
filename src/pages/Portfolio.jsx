@@ -276,7 +276,7 @@ function MobilePortfolio() {
         </div>
       )}
 
-      {showAdd && <AddStockModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />}
+      {showAdd && <AddStockModal onClose={() => setShowAdd(false)} onAdd={handleAdd} existingCodes={stocks.map(s => s.code)} />}
     </div>
   );
 }

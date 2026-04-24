@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { searchStock } from '../../store';
 
-export default function AddStockModal({ onClose, onAdd }) {
+export default function AddStockModal({ onClose, onAdd, existingCodes = [] }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [status, setStatus] = useState('watching');
@@ -30,10 +30,11 @@ export default function AddStockModal({ onClose, onAdd }) {
   }
 
   const isValid = searchResult && searchResult !== 'not_found';
+  const isDuplicate = isValid && existingCodes.includes(searchResult.code);
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!isValid) return;
+    if (!isValid || isDuplicate) return;
     onAdd({ name: searchResult.name, code: searchResult.code, status });
     onClose();
   }
@@ -71,6 +72,7 @@ export default function AddStockModal({ onClose, onAdd }) {
               />
               {searching && <p className="text-xs text-[var(--ink-faint)] mt-1.5">查询中...</p>}
               {searchResult === 'not_found' && <p className="text-xs text-[var(--loss)] mt-1.5">未找到该股票代码</p>}
+              {isDuplicate && <p className="text-xs text-[var(--loss)] mt-1.5">该股票已在组合中，不能重复添加</p>}
               {isValid && (
                 <div className="mt-2 border border-[var(--line)] rounded-[var(--radius)] bg-[var(--bg)] overflow-hidden">
                   <div className="flex items-baseline justify-between px-3.5 py-2.5 bg-[var(--accent-soft)]">
@@ -131,7 +133,7 @@ export default function AddStockModal({ onClose, onAdd }) {
             </button>
             <button
               type="submit"
-              disabled={!isValid}
+              disabled={!isValid || isDuplicate}
               className="px-4 py-2 rounded-full text-[13px] font-medium border-0 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: 'var(--ink)', color: 'var(--bg)' }}
             >
