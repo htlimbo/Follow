@@ -40,6 +40,13 @@ export function formatDate(iso) {
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 }
 
+// 根据代码段位推断品种类型：A 股 ETF 使用 1[5-8] / 5[1,6,8] 段位
+// HK 五位代码与股票同段位，无法区分，统一返回 stock，让用户后续手动改 type
+export function detectInstrumentType(code) {
+  if (/^(15|16|18|51|56|58)/.test(code)) return 'etf';
+  return 'stock';
+}
+
 export function isTradingHour() {
   const now = new Date();
   const day = now.getDay();

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { searchStock } from '../../store';
+import { detectInstrumentType } from '../../utils';
 
 export default function AddStockModal({ onClose, onAdd, existingCodes = [] }) {
   const [name, setName] = useState('');
@@ -35,7 +36,8 @@ export default function AddStockModal({ onClose, onAdd, existingCodes = [] }) {
   function handleSubmit(e) {
     e.preventDefault();
     if (!isValid || isDuplicate) return;
-    onAdd({ name: searchResult.name, code: searchResult.code, status });
+    const type = detectInstrumentType(searchResult.code);
+    onAdd({ name: searchResult.name, code: searchResult.code, status, type });
     onClose();
   }
 
@@ -73,19 +75,36 @@ export default function AddStockModal({ onClose, onAdd, existingCodes = [] }) {
               {searching && <p className="text-xs text-[var(--ink-faint)] mt-1.5">查询中...</p>}
               {searchResult === 'not_found' && <p className="text-xs text-[var(--loss)] mt-1.5">未找到该股票代码</p>}
               {isDuplicate && <p className="text-xs text-[var(--loss)] mt-1.5">该股票已在组合中，不能重复添加</p>}
-              {isValid && (
-                <div className="mt-2 border border-[var(--line)] rounded-[var(--radius)] bg-[var(--bg)] overflow-hidden">
-                  <div className="flex items-baseline justify-between px-3.5 py-2.5 bg-[var(--accent-soft)]">
-                    <div>
-                      <span className="font-serif text-sm">{searchResult.name}</span>
-                      <span className="font-mono text-[11px] text-[var(--ink-faint)] ml-2">{searchResult.code}</span>
+              {isValid && (() => {
+                const isEtf = detectInstrumentType(searchResult.code) === 'etf';
+                let marketLabel;
+                if (searchResult.market === 'HK') {
+                  marketLabel = 'HK · 港股';
+                } else if (/^(6|5|9|113|110|11[8-9])/.test(searchResult.code)) {
+                  marketLabel = 'SH · 沪市';
+                } else {
+                  marketLabel = 'SZ · 深市';
+                }
+                return (
+                  <div className="mt-2 border border-[var(--line)] rounded-[var(--radius)] bg-[var(--bg)] overflow-hidden">
+                    <div className="flex items-baseline justify-between px-3.5 py-2.5 bg-[var(--accent-soft)]">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-serif text-sm">{searchResult.name}</span>
+                        {isEtf && (
+                          <span
+                            className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                            style={{ background: 'var(--accent)', color: 'var(--bg)' }}
+                          >
+                            ETF
+                          </span>
+                        )}
+                        <span className="font-mono text-[11px] text-[var(--ink-faint)]">{searchResult.code}</span>
+                      </div>
+                      <span className="font-mono text-[11px] text-[var(--ink-soft)]">{marketLabel}</span>
                     </div>
-                    <span className="font-mono text-[11px] text-[var(--ink-soft)]">
-                      {searchResult.market === 'HK' ? 'HK · 港股' : searchResult.code.startsWith('6') ? 'SH · 沪市' : 'SZ · 深市'}
-                    </span>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Status choice */}

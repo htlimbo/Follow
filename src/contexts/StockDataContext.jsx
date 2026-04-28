@@ -1,10 +1,12 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { getStocks, addStock, getAllEntries, exportData, importData, refreshPrices, getCashBalance, setCashBalance, getPriceHistory } from '../store';
 import { isTradingHour } from '../utils';
+import { useAccount } from './AccountContext';
 
 const StockDataContext = createContext(null);
 
 export function StockDataProvider({ children }) {
+  const { activeAccountId, loading: accountLoading } = useAccount();
   const [stocks, setStocks] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,9 +16,13 @@ export function StockDataProvider({ children }) {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
+    if (accountLoading) return;
+    let cancelled = false;
+    setLoading(true);
     async function load() {
       try {
         const [s, e, cash] = await Promise.all([getStocks(), getAllEntries(), getCashBalance()]);
+        if (cancelled) return;
         setStocks(s);
         setEntries(e);
         setCashBal(cash);
@@ -24,6 +30,7 @@ export function StockDataProvider({ children }) {
         if (isTradingHour() && s.length > 0) {
           try {
             const prices = await refreshPrices(s);
+            if (cancelled) return;
             if (Object.keys(prices).length > 0) {
               setStocks(prev => prev.map(stock => {
                 const quote = prices[stock.code];
@@ -42,19 +49,23 @@ export function StockDataProvider({ children }) {
             const historyEntries = await Promise.all(
               s.map(stock => getPriceHistory(stock.id, 30).then(h => [stock.id, h]))
             );
+            if (cancelled) return;
             const map = {};
             historyEntries.forEach(([id, history]) => { map[id] = history; });
             setPriceHistoryMap(map);
           } catch { /* 价格历史加载失败不影响页面 */ }
+        } else {
+          setPriceHistoryMap({});
         }
       } catch (err) {
         console.error('Failed to load data:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     load();
-  }, []);
+    return () => { cancelled = true; };
+  }, [activeAccountId, accountLoading]);
 
   const handleAdd = useCallback(async (data) => {
     try {

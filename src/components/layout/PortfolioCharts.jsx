@@ -1,5 +1,6 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatMoney, formatPnl } from '../../utils';
+import NetValueChart from '../portfolio/NetValueChart';
 
 // Design-system–aligned palette
 const CHART_COLORS = [
@@ -84,6 +85,9 @@ export default function PortfolioCharts({ holdingStocks, cashBalance = '' }) {
           subClass={hasPnlData ? (totalPnlPct >= 0 ? 'text-positive' : 'text-negative') : ''}
         />
       </div>
+
+      {/* Net value curve */}
+      <NetValueChart />
 
       {/* Donut chart card */}
       {pieData.length > 0 && (

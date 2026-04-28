@@ -1,11 +1,13 @@
 import { useContext, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, Settings, HardDrive, Cloud, Key, Sun, Moon, Palette } from 'lucide-react';
+import { LogOut, Settings, HardDrive, Cloud, Key, Sun, Moon, Palette, Wallet, Check, ChevronRight } from 'lucide-react';
 import { Logo } from '../ui/Logo';
 import { supabase } from '../../supabaseClient';
 import { isTauri, getStorageMode, setStorageMode } from '../../store';
 import { LicenseContext } from '../../App';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAccount } from '../../contexts/AccountContext';
+import AccountManageModal from '../account/AccountManageModal';
 
 const THEME_META = {
   paper: { label: '暖纸', icon: Sun, desc: '明亮温暖' },
@@ -46,6 +48,10 @@ export default function SideNav() {
   const isLocal = storageMode === 'local';
   const [confirmSwitch, setConfirmSwitch] = useState(null);
   const { theme, setTheme, themes } = useTheme();
+  const { accounts, activeAccountId, activeAccount, switchAccount } = useAccount();
+  const [showAccounts, setShowAccounts] = useState(false);
+  const [showManageAccounts, setShowManageAccounts] = useState(false);
+  const accountInitial = activeAccount?.name?.[0] || '账';
 
   const isPortfolio = location.pathname === '/' || location.pathname.startsWith('/stock/');
   const isReview = location.pathname === '/review';
@@ -68,11 +74,64 @@ export default function SideNav() {
       {/* Logo */}
       <button
         onClick={() => navigate('/')}
-        className="mb-5 bg-transparent border-0 cursor-pointer"
+        className="mb-3 bg-transparent border-0 cursor-pointer"
         title="FollowMind"
       >
         <Logo size={22} withBg />
       </button>
+
+      {/* Account switcher */}
+      <div className="relative mb-3">
+        <button
+          onClick={() => setShowAccounts(s => !s)}
+          title={activeAccount?.name || '账户'}
+          className="w-10 h-10 rounded-lg flex items-center justify-center font-serif text-[13px] cursor-pointer border-0 transition-colors"
+          style={{
+            background: showAccounts ? 'var(--accent-soft)' : 'var(--bg-sunken)',
+            color: showAccounts ? 'var(--accent)' : 'var(--ink)',
+          }}
+        >
+          {accountInitial}
+        </button>
+        {showAccounts && (
+          <>
+            <div className="fixed inset-0 z-20" onClick={() => setShowAccounts(false)} />
+            <div className="absolute left-full top-0 ml-2 z-30 w-56 rounded-xl overflow-hidden border"
+              style={{ background: 'var(--bg-raised)', borderColor: 'var(--line)', boxShadow: 'var(--shadow-card)' }}>
+              <div className="p-2 border-b" style={{ borderColor: 'var(--line)' }}>
+                <p className="text-[11px] uppercase tracking-widest px-2 pt-1 pb-1.5" style={{ color: 'var(--ink-faint)' }}>账户</p>
+                {accounts.map(a => (
+                  <button
+                    key={a.id}
+                    onClick={() => { switchAccount(a.id); setShowAccounts(false); }}
+                    className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm cursor-pointer border-0 transition-colors"
+                    style={{
+                      background: activeAccountId === a.id ? 'var(--accent-soft)' : 'transparent',
+                      color: activeAccountId === a.id ? 'var(--accent)' : 'var(--ink)',
+                    }}
+                  >
+                    <Wallet size={14} />
+                    <span className="flex-1 text-left truncate">{a.name}</span>
+                    {activeAccountId === a.id && <Check size={14} />}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => { setShowAccounts(false); setShowManageAccounts(true); }}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer border-0 transition-colors"
+                style={{ background: 'transparent', color: 'var(--ink-soft)' }}
+              >
+                <span className="flex-1 text-left">管理账户</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {showManageAccounts && (
+        <AccountManageModal onClose={() => setShowManageAccounts(false)} />
+      )}
 
       {/* Nav items */}
       <nav className="flex flex-col items-center gap-1 flex-1">

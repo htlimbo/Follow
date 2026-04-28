@@ -5,6 +5,7 @@ import AppShell from './components/layout/AppShell';
 import AuthGuard from './components/layout/AuthGuard';
 import { StockDataProvider } from './contexts/StockDataContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AccountProvider } from './contexts/AccountContext';
 import Portfolio from './pages/Portfolio';
 import StockDetail from './pages/StockDetail';
 import Review from './pages/Review';
@@ -62,16 +63,18 @@ export default function App() {
         <LicenseContext.Provider value={{ ...licenseStatus, showActivation: () => setShowActivation(true) }}>
           <BrowserRouter>
             <AuthGuard>
-              <StockDataProvider>
-                <Routes>
-                  <Route element={<AppShell />}>
-                    <Route path="/" element={<Portfolio />} />
-                    <Route path="/stock/:id" element={<StockDetail />} />
-                    <Route path="/review" element={<Review />} />
-                    <Route path="/journal" element={<Journal />} />
-                  </Route>
-                </Routes>
-              </StockDataProvider>
+              <AccountProvider>
+                <StockDataProvider>
+                  <Routes>
+                    <Route element={<AppShell />}>
+                      <Route path="/" element={<Portfolio />} />
+                      <Route path="/stock/:id" element={<StockDetail />} />
+                      <Route path="/review" element={<Review />} />
+                      <Route path="/journal" element={<Journal />} />
+                    </Route>
+                  </Routes>
+                </StockDataProvider>
+              </AccountProvider>
             </AuthGuard>
           </BrowserRouter>
         </LicenseContext.Provider>

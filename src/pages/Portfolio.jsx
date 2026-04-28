@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, ArrowUpDown, RefreshCw, Download, Upload } from 'lucide-react';
 import { useStockData } from '../contexts/StockDataContext';
+import { useAccount } from '../contexts/AccountContext';
 import { seedDemo } from '../seedDemo';
 import { getStocks, getAllEntries } from '../store';
 import AddStockModal from '../components/stock/AddStockModal';
@@ -32,6 +33,7 @@ export default function Portfolio() {
 
 function DesktopPortfolio() {
   const { holdingStocks, stocks, cashBalance, handleSaveCash, loading } = useStockData();
+  const { activeAccount } = useAccount();
   const [editingCash, setEditingCash] = useState(false);
   const [cashInput, setCashInput] = useState('');
 
@@ -48,7 +50,14 @@ function DesktopPortfolio() {
       {/* Page header */}
       <div className="pb-5 border-b border-[var(--line)] mb-6">
         <div className="text-[11px] tracking-[0.14em] uppercase text-[var(--ink-faint)] mb-1.5">Portfolio · 统计</div>
-        <h1 className="font-serif text-[30px] font-semibold tracking-tight leading-tight">组合统计</h1>
+        <h1 className="font-serif text-[30px] font-semibold tracking-tight leading-tight">
+          组合统计
+          {activeAccount && (
+            <span className="ml-3 font-mono text-[14px] font-normal" style={{ color: 'var(--ink-faint)' }}>
+              · {activeAccount.name}
+            </span>
+          )}
+        </h1>
         <div className="mt-1.5 text-[13px] text-[var(--ink-soft)]">
           截至 {dateStr} · {holdingStocks.length} 只持仓{watchCount > 0 ? ` · ${watchCount} 只观察中` : ''}
         </div>

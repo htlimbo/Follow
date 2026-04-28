@@ -74,4 +74,15 @@ export const {
   // Export / Import
   exportData,
   importData,
+  // Account
+  setActiveAccount,
+  getActiveAccount,
+  getAccounts,
+  addAccount,
+  updateAccount,
+  deleteAccount,
+  ensureDefaultAccount,
+  // Snapshots
+  getSnapshots,
+  writeSnapshotIfMissing,
 } = impl;

@@ -6,6 +6,12 @@ import { fetchQuotes, searchStock as _searchStock } from './shared.js';
 
 let db;
 
+// 当前激活的账户 id（与 supabase.js 同义，AccountContext 切换账户时调用 setActiveAccount）
+let currentAccountId = null;
+
+export function setActiveAccount(id) { currentAccountId = id || null; }
+export function getActiveAccount() { return currentAccountId; }
+
 async function getDb() {
   if (!db) {
     db = await Database.load('sqlite:follow.db');
@@ -62,6 +68,9 @@ async function initTables() {
   // 为已有数据库添加新列（IF NOT EXISTS 不支持 ALTER，用 try/catch 兼容）
   try { await db.execute('ALTER TABLE entries ADD COLUMN snapshot_data TEXT DEFAULT NULL'); } catch {}
   try { await db.execute('ALTER TABLE entries ADD COLUMN logic_tags TEXT DEFAULT NULL'); } catch {}
+  try { await db.execute("ALTER TABLE stocks ADD COLUMN type TEXT DEFAULT 'stock'"); } catch {}
+  try { await db.execute('ALTER TABLE stocks ADD COLUMN account_id TEXT DEFAULT NULL'); } catch {}
+  try { await db.execute('ALTER TABLE portfolio_settings ADD COLUMN account_id TEXT DEFAULT NULL'); } catch {}
   await db.execute(`
     CREATE TABLE IF NOT EXISTS reviews (
       id TEXT PRIMARY KEY,
@@ -103,6 +112,32 @@ async function initTables() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      color TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0,
+      is_default INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL,
+      recorded_at TEXT NOT NULL,
+      market_value TEXT DEFAULT '0',
+      cash TEXT DEFAULT '0',
+      total_value TEXT DEFAULT '0',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+    )
+  `);
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshots_account_date
+    ON portfolio_snapshots (account_id, recorded_at)
+  `);
   // 开启外键约束（SQLite 默认关闭）
   await db.execute('PRAGMA foreign_keys = ON');
 }
@@ -129,6 +164,8 @@ function mapStock(row) {
     thesis: row.thesis || '',
     bullCase: row.bull_case || '',
     bearCase: row.bear_case || '',
+    type: row.type || 'stock',
+    accountId: row.account_id || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -177,11 +214,86 @@ function mapReview(row) {
   };
 }
 
+// ── Account CRUD ──
+
+function mapAccount(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color || '',
+    sortOrder: row.sort_order || 0,
+    isDefault: !!row.is_default,
+    createdAt: row.created_at,
+  };
+}
+
+export async function getAccounts() {
+  const d = await getDb();
+  const rows = await d.select('SELECT * FROM accounts ORDER BY sort_order ASC, created_at ASC');
+  return rows.map(mapAccount);
+}
+
+export async function addAccount({ name, color = '' } = {}) {
+  const d = await getDb();
+  const id = uuid();
+  await d.execute(
+    'INSERT INTO accounts (id, name, color, sort_order, is_default) VALUES ($1, $2, $3, 0, 0)',
+    [id, name, color]
+  );
+  const rows = await d.select('SELECT * FROM accounts WHERE id = $1', [id]);
+  return mapAccount(rows[0]);
+}
+
+export async function updateAccount(id, updates) {
+  const d = await getDb();
+  const sets = [];
+  const vals = [];
+  let idx = 1;
+  if (updates.name !== undefined) { sets.push(`name = $${idx}`); vals.push(updates.name); idx++; }
+  if (updates.color !== undefined) { sets.push(`color = $${idx}`); vals.push(updates.color); idx++; }
+  if (updates.sortOrder !== undefined) { sets.push(`sort_order = $${idx}`); vals.push(updates.sortOrder); idx++; }
+  if (sets.length === 0) {
+    const rows = await d.select('SELECT * FROM accounts WHERE id = $1', [id]);
+    return rows.length > 0 ? mapAccount(rows[0]) : null;
+  }
+  vals.push(id);
+  await d.execute(`UPDATE accounts SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
+  const rows = await d.select('SELECT * FROM accounts WHERE id = $1', [id]);
+  return mapAccount(rows[0]);
+}
+
+export async function deleteAccount(id) {
+  const d = await getDb();
+  const rows = await d.select('SELECT is_default FROM accounts WHERE id = $1', [id]);
+  if (rows.length > 0 && rows[0].is_default) throw new Error('默认账户不可删除');
+  await d.execute('DELETE FROM accounts WHERE id = $1', [id]);
+}
+
+export async function ensureDefaultAccount() {
+  const d = await getDb();
+  const rows = await d.select('SELECT * FROM accounts ORDER BY sort_order ASC, created_at ASC');
+  if (rows.length > 0) {
+    const def = rows.find(r => r.is_default) || rows[0];
+    return mapAccount(def);
+  }
+  const id = uuid();
+  await d.execute(
+    "INSERT INTO accounts (id, name, color, sort_order, is_default) VALUES ($1, '默认账户', '', 0, 1)",
+    [id]
+  );
+  await d.execute('UPDATE stocks SET account_id = $1 WHERE account_id IS NULL', [id]);
+  await d.execute('UPDATE portfolio_settings SET account_id = $1 WHERE account_id IS NULL', [id]);
+  const newRows = await d.select('SELECT * FROM accounts WHERE id = $1', [id]);
+  return mapAccount(newRows[0]);
+}
+
 // ── Stock operations ──
 
 export async function getStocks() {
   const d = await getDb();
-  const rows = await d.select('SELECT * FROM stocks ORDER BY created_at DESC');
+  const rows = currentAccountId
+    ? await d.select('SELECT * FROM stocks WHERE account_id = $1 ORDER BY created_at DESC', [currentAccountId])
+    : await d.select('SELECT * FROM stocks ORDER BY created_at DESC');
   return rows.map(mapStock);
 }
 
@@ -191,14 +303,15 @@ export async function getStock(id) {
   return rows.length > 0 ? mapStock(rows[0]) : null;
 }
 
-export async function addStock({ name, code, status = 'holding', shares = '', costPrice = '', currentPrice = '', thesis = '', bullCase = '', bearCase = '' }) {
+export async function addStock({ name, code, status = 'holding', shares = '', costPrice = '', currentPrice = '', thesis = '', bullCase = '', bearCase = '', type = 'stock' }) {
   const d = await getDb();
   const id = uuid();
   const ts = now();
+  const accountId = currentAccountId;
   await d.execute(
-    `INSERT INTO stocks (id, name, code, status, shares, cost_price, current_price, thesis, bull_case, bear_case, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-    [id, name, code, status, shares, costPrice, currentPrice, thesis, bullCase, bearCase, ts, ts]
+    `INSERT INTO stocks (id, name, code, status, shares, cost_price, current_price, thesis, bull_case, bear_case, type, account_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+    [id, name, code, status, shares, costPrice, currentPrice, thesis, bullCase, bearCase, type, accountId, ts, ts]
   );
   const rows = await d.select('SELECT * FROM stocks WHERE id = $1', [id]);
   return mapStock(rows[0]);
@@ -214,6 +327,7 @@ export async function updateStock(id, updates) {
     name: 'name', code: 'code', status: 'status', shares: 'shares',
     costPrice: 'cost_price', currentPrice: 'current_price',
     thesis: 'thesis', bullCase: 'bull_case', bearCase: 'bear_case',
+    type: 'type',
   };
   for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
     if (updates[jsKey] !== undefined) {
@@ -302,12 +416,20 @@ export async function deleteAnchor(id) {
 
 export async function getAllAnchors() {
   const d = await getDb();
-  const rows = await d.select(`
-    SELECT a.*, s.name AS stock_name
-    FROM anchors a
-    JOIN stocks s ON a.stock_id = s.id
-    ORDER BY a.created_at ASC
-  `);
+  const rows = currentAccountId
+    ? await d.select(`
+        SELECT a.*, s.name AS stock_name
+        FROM anchors a
+        JOIN stocks s ON a.stock_id = s.id
+        WHERE s.account_id = $1
+        ORDER BY a.created_at ASC
+      `, [currentAccountId])
+    : await d.select(`
+        SELECT a.*, s.name AS stock_name
+        FROM anchors a
+        JOIN stocks s ON a.stock_id = s.id
+        ORDER BY a.created_at ASC
+      `);
   return rows.map(row => ({
     ...mapAnchor(row),
     stockName: row.stock_name || '',
@@ -324,7 +446,14 @@ export async function getEntries(stockId) {
 
 export async function getAllEntries() {
   const d = await getDb();
-  const rows = await d.select('SELECT * FROM entries ORDER BY created_at DESC');
+  const rows = currentAccountId
+    ? await d.select(`
+        SELECT e.* FROM entries e
+        JOIN stocks s ON e.stock_id = s.id
+        WHERE s.account_id = $1
+        ORDER BY e.created_at DESC
+      `, [currentAccountId])
+    : await d.select('SELECT * FROM entries ORDER BY created_at DESC');
   return rows.map(mapEntry);
 }
 
@@ -385,7 +514,67 @@ export async function refreshPrices(stocks) {
     }
   }
 
+  // 当日组合净值快照（按当前账户）
+  if (currentAccountId) {
+    try {
+      let marketValue = 0;
+      for (const stock of stocks) {
+        if (stock.status !== 'holding') continue;
+        const quote = prices[stock.code];
+        const px = quote?.price != null ? quote.price : parseFloat(stock.currentPrice);
+        const sh = parseFloat(stock.shares);
+        if (!isNaN(px) && !isNaN(sh)) marketValue += px * sh;
+      }
+      const cash = await getCashBalance();
+      const cashNum = parseFloat(cash) || 0;
+      await writeSnapshotIfMissing({ marketValue, cash: cashNum, recordedAt: today });
+    } catch { /* 快照失败不影响行情刷新 */ }
+  }
+
   return prices;
+}
+
+// ── Portfolio snapshots ──
+
+export async function getSnapshots(accountId, days = 90) {
+  const id = accountId || currentAccountId;
+  if (!id) return [];
+  const d = await getDb();
+  const rows = await d.select(
+    `SELECT recorded_at, market_value, cash, total_value FROM portfolio_snapshots
+     WHERE account_id = $1
+     ORDER BY recorded_at DESC
+     LIMIT $2`,
+    [id, days]
+  );
+  return rows.map(r => ({
+    date: r.recorded_at,
+    marketValue: parseFloat(r.market_value) || 0,
+    cash: parseFloat(r.cash) || 0,
+    totalValue: parseFloat(r.total_value) || 0,
+  })).reverse();
+}
+
+export async function writeSnapshotIfMissing({ marketValue, cash, recordedAt }) {
+  if (!currentAccountId) return;
+  const d = await getDb();
+  const total = (Number(marketValue) || 0) + (Number(cash) || 0);
+  const existing = await d.select(
+    'SELECT id FROM portfolio_snapshots WHERE account_id = $1 AND recorded_at = $2',
+    [currentAccountId, recordedAt]
+  );
+  if (existing.length > 0) {
+    await d.execute(
+      'UPDATE portfolio_snapshots SET market_value = $1, cash = $2, total_value = $3 WHERE id = $4',
+      [String(marketValue || 0), String(cash || 0), String(total), existing[0].id]
+    );
+  } else {
+    await d.execute(
+      `INSERT INTO portfolio_snapshots (id, account_id, recorded_at, market_value, cash, total_value)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [uuid(), currentAccountId, recordedAt, String(marketValue || 0), String(cash || 0), String(total)]
+    );
+  }
 }
 
 // ── Price history ──
@@ -410,16 +599,20 @@ export { _searchStock as searchStock };
 
 export async function getReviewableEntries(startDate, endDate) {
   const d = await getDb();
+  const params = [startDate, endDate + 'T23:59:59'];
+  let where = `e.type IN ('buy', 'sell', 'adjust') AND e.created_at >= $1 AND e.created_at <= $2`;
+  if (currentAccountId) {
+    where += ` AND s.account_id = $3`;
+    params.push(currentAccountId);
+  }
   const rows = await d.select(`
     SELECT e.*, s.name AS stock_name, s.code AS stock_code,
            s.current_price AS stock_current_price, s.cost_price AS stock_cost_price
     FROM entries e
     JOIN stocks s ON e.stock_id = s.id
-    WHERE e.type IN ('buy', 'sell', 'adjust')
-      AND e.created_at >= $1
-      AND e.created_at <= $2
+    WHERE ${where}
     ORDER BY e.created_at DESC
-  `, [startDate, endDate + 'T23:59:59']);
+  `, params);
   return rows.map(row => ({
     ...mapEntry(row),
     stockName: row.stock_name || '',
@@ -441,11 +634,24 @@ export async function updateEntryVerdict(entryId, verdict) {
 
 export async function getEntriesInRange(startDate, endDate) {
   const d = await getDb();
-  const rows = await d.select(`
-    SELECT * FROM entries
-    WHERE created_at >= $1 AND created_at <= $2
-    ORDER BY created_at DESC
-  `, [startDate, endDate + 'T23:59:59']);
+  const params = [startDate, endDate + 'T23:59:59'];
+  let sql;
+  if (currentAccountId) {
+    params.push(currentAccountId);
+    sql = `
+      SELECT e.* FROM entries e
+      JOIN stocks s ON e.stock_id = s.id
+      WHERE e.created_at >= $1 AND e.created_at <= $2 AND s.account_id = $3
+      ORDER BY e.created_at DESC
+    `;
+  } else {
+    sql = `
+      SELECT * FROM entries
+      WHERE created_at >= $1 AND created_at <= $2
+      ORDER BY created_at DESC
+    `;
+  }
+  const rows = await d.select(sql, params);
   return rows.map(mapEntry);
 }
 
@@ -496,13 +702,17 @@ export async function deleteReview(id) {
 
 export async function getCashBalance() {
   const d = await getDb();
-  const rows = await d.select('SELECT cash_balance FROM portfolio_settings LIMIT 1');
+  const rows = currentAccountId
+    ? await d.select('SELECT cash_balance FROM portfolio_settings WHERE account_id = $1 LIMIT 1', [currentAccountId])
+    : await d.select('SELECT cash_balance FROM portfolio_settings WHERE account_id IS NULL LIMIT 1');
   return rows.length > 0 ? (rows[0].cash_balance || '') : '';
 }
 
 export async function setCashBalance(amount) {
   const d = await getDb();
-  const rows = await d.select('SELECT id FROM portfolio_settings LIMIT 1');
+  const rows = currentAccountId
+    ? await d.select('SELECT id FROM portfolio_settings WHERE account_id = $1 LIMIT 1', [currentAccountId])
+    : await d.select('SELECT id FROM portfolio_settings WHERE account_id IS NULL LIMIT 1');
   const ts = now();
   if (rows.length > 0) {
     await d.execute(
@@ -511,8 +721,8 @@ export async function setCashBalance(amount) {
     );
   } else {
     await d.execute(
-      'INSERT INTO portfolio_settings (id, cash_balance, created_at, updated_at) VALUES ($1, $2, $3, $4)',
-      [uuid(), amount, ts, ts]
+      'INSERT INTO portfolio_settings (id, account_id, cash_balance, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
+      [uuid(), currentAccountId, amount, ts, ts]
     );
   }
 }
@@ -578,9 +788,26 @@ function mapJournal(row) {
 
 export async function exportData() {
   const d = await getDb();
-  const stockRows = await d.select('SELECT * FROM stocks ORDER BY created_at DESC');
-  const entryRows = await d.select('SELECT * FROM entries ORDER BY created_at DESC');
-  const anchorRows = await d.select('SELECT * FROM anchors ORDER BY created_at ASC');
+  let stockRows, entryRows, anchorRows;
+  if (currentAccountId) {
+    stockRows = await d.select('SELECT * FROM stocks WHERE account_id = $1 ORDER BY created_at DESC', [currentAccountId]);
+    entryRows = await d.select(`
+      SELECT e.* FROM entries e
+      JOIN stocks s ON e.stock_id = s.id
+      WHERE s.account_id = $1
+      ORDER BY e.created_at DESC
+    `, [currentAccountId]);
+    anchorRows = await d.select(`
+      SELECT a.* FROM anchors a
+      JOIN stocks s ON a.stock_id = s.id
+      WHERE s.account_id = $1
+      ORDER BY a.created_at ASC
+    `, [currentAccountId]);
+  } else {
+    stockRows = await d.select('SELECT * FROM stocks ORDER BY created_at DESC');
+    entryRows = await d.select('SELECT * FROM entries ORDER BY created_at DESC');
+    anchorRows = await d.select('SELECT * FROM anchors ORDER BY created_at ASC');
+  }
 
   const stockList = stockRows.map(mapStock);
 
@@ -610,11 +837,11 @@ export async function importData(jsonStr) {
       const stockId = uuid();
       const ts = now();
       await d.execute(
-        `INSERT INTO stocks (id, name, code, status, shares, cost_price, current_price, thesis, bull_case, bear_case, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        `INSERT INTO stocks (id, name, code, status, shares, cost_price, current_price, thesis, bull_case, bear_case, type, account_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
         [stockId, s.name, s.code || '', s.status || 'holding', s.shares || '',
          s.costPrice || '', s.currentPrice || '', s.thesis || '',
-         s.bullCase || '', s.bearCase || '', ts, ts]
+         s.bullCase || '', s.bearCase || '', s.type || 'stock', currentAccountId, ts, ts]
       );
 
       // Insert anchors
