@@ -1,12 +1,21 @@
 // 共享网络逻辑：行情刷新 + 股票搜索（腾讯财经 API）
 // 这些函数与存储层无关，supabase.js 和 sqlite.js 都复用。
 
+// A 股市场前缀路由：覆盖股票 + ETF + 转债 + B股
+// 沪市（s_sh）：6xx 股票 / 5xx ETF / 11x 转债 / 9xx B股
+// 深市（s_sz）：0xx/3xx 股票 / 1[5-8]x ETF / 12x 转债
+export function getQtPrefix(code) {
+  if (/^\d{5}$/.test(code)) return 'r_hk';
+  if (!/^\d{6}$/.test(code)) return null;
+  if (/^(6|5|9|113|110|11[8-9])/.test(code)) return 's_sh';
+  if (/^(0|3|1[5-8]|12)/.test(code)) return 's_sz';
+  return null;
+}
+
 function buildQtSymbols(stocks) {
-  // A股：s_sh600519（沪）/ s_sz300750（深）；港股：r_hk00700
   return stocks.map(s => {
-    if (/^\d{5}$/.test(s.code)) return `r_hk${s.code}`;
-    if (/^\d{6}$/.test(s.code)) return s.code.startsWith('6') ? `s_sh${s.code}` : `s_sz${s.code}`;
-    return null;
+    const prefix = getQtPrefix(s.code);
+    return prefix ? `${prefix}${s.code}` : null;
   }).filter(Boolean);
 }
 
@@ -33,12 +42,11 @@ function parseQtResponse(text) {
  * @returns {{ [code: string]: { price: number, change: number, name: string } }}
  */
 export async function fetchQuotes(stocks) {
-  const aStocks = stocks.filter(s => /^\d{6}$/.test(s.code));
-  const hkStocks = stocks.filter(s => /^\d{5}$/.test(s.code));
-  const allQuotable = [...aStocks, ...hkStocks];
-  if (allQuotable.length === 0) return {};
+  const quotable = stocks.filter(s => getQtPrefix(s.code));
+  if (quotable.length === 0) return {};
 
-  const symbols = buildQtSymbols(allQuotable);
+  const symbols = buildQtSymbols(quotable);
+  if (symbols.length === 0) return {};
   const url = `https://qt.gtimg.cn/q=${symbols.join(',')}`;
 
   try {
@@ -59,17 +67,21 @@ export async function searchStock(code) {
 
   let symbol = null;
   let market = null;
+  let normalizedCode = code;
 
   if (/^\d{6}$/.test(code)) {
-    symbol = code.startsWith('6') ? `s_sh${code}` : `s_sz${code}`;
-    market = 'A';
+    const prefix = getQtPrefix(code);
+    if (prefix === 's_sh' || prefix === 's_sz') {
+      symbol = `${prefix}${code}`;
+      market = 'A';
+    }
   }
 
   if (!symbol) {
     const hkMatch = code.match(/^(\d{1,5})(\.HK)?$/i);
     if (hkMatch) {
-      const hkCode = hkMatch[1].padStart(5, '0');
-      symbol = `r_hk${hkCode}`;
+      normalizedCode = hkMatch[1].padStart(5, '0');
+      symbol = `r_hk${normalizedCode}`;
       market = 'HK';
     }
   }

@@ -62,6 +62,7 @@ async function initTables() {
   // 为已有数据库添加新列（IF NOT EXISTS 不支持 ALTER，用 try/catch 兼容）
   try { await db.execute('ALTER TABLE entries ADD COLUMN snapshot_data TEXT DEFAULT NULL'); } catch {}
   try { await db.execute('ALTER TABLE entries ADD COLUMN logic_tags TEXT DEFAULT NULL'); } catch {}
+  try { await db.execute("ALTER TABLE stocks ADD COLUMN type TEXT DEFAULT 'stock'"); } catch {}
   await db.execute(`
     CREATE TABLE IF NOT EXISTS reviews (
       id TEXT PRIMARY KEY,
@@ -129,6 +130,7 @@ function mapStock(row) {
     thesis: row.thesis || '',
     bullCase: row.bull_case || '',
     bearCase: row.bear_case || '',
+    type: row.type || 'stock',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -191,14 +193,14 @@ export async function getStock(id) {
   return rows.length > 0 ? mapStock(rows[0]) : null;
 }
 
-export async function addStock({ name, code, status = 'holding', shares = '', costPrice = '', currentPrice = '', thesis = '', bullCase = '', bearCase = '' }) {
+export async function addStock({ name, code, status = 'holding', shares = '', costPrice = '', currentPrice = '', thesis = '', bullCase = '', bearCase = '', type = 'stock' }) {
   const d = await getDb();
   const id = uuid();
   const ts = now();
   await d.execute(
-    `INSERT INTO stocks (id, name, code, status, shares, cost_price, current_price, thesis, bull_case, bear_case, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-    [id, name, code, status, shares, costPrice, currentPrice, thesis, bullCase, bearCase, ts, ts]
+    `INSERT INTO stocks (id, name, code, status, shares, cost_price, current_price, thesis, bull_case, bear_case, type, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [id, name, code, status, shares, costPrice, currentPrice, thesis, bullCase, bearCase, type, ts, ts]
   );
   const rows = await d.select('SELECT * FROM stocks WHERE id = $1', [id]);
   return mapStock(rows[0]);
@@ -214,6 +216,7 @@ export async function updateStock(id, updates) {
     name: 'name', code: 'code', status: 'status', shares: 'shares',
     costPrice: 'cost_price', currentPrice: 'current_price',
     thesis: 'thesis', bullCase: 'bull_case', bearCase: 'bear_case',
+    type: 'type',
   };
   for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
     if (updates[jsKey] !== undefined) {

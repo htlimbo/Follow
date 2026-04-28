@@ -54,6 +54,14 @@ export default function StockCard({ stock, latestEntry, entryCount, compact, sel
         <div className="flex items-baseline justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-serif text-base font-medium tracking-tight truncate">{stock.name}</span>
+            {stock.type === 'etf' && (
+              <span
+                className="text-[9px] font-mono px-1 py-px rounded-sm shrink-0 tracking-wider"
+                style={{ background: 'var(--accent)', color: 'var(--bg)' }}
+              >
+                ETF
+              </span>
+            )}
             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-sm shrink-0 tracking-wide ${tagStyle}`}>
               {tagLabel}
             </span>
@@ -101,6 +109,14 @@ export default function StockCard({ stock, latestEntry, entryCount, compact, sel
         <div className="flex items-baseline justify-between gap-2 mb-1">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="font-serif text-base font-medium tracking-tight">{stock.name}</span>
+            {stock.type === 'etf' && (
+              <span
+                className="text-[9px] font-mono px-1 py-px rounded-sm tracking-wider"
+                style={{ background: 'var(--accent)', color: 'var(--bg)' }}
+              >
+                ETF
+              </span>
+            )}
             {stock.code && <span className="text-[11px] font-mono text-[var(--ink-faint)] tracking-wider">{stock.code}</span>}
           </div>
           <div className="flex items-center gap-2 shrink-0">

@@ -22,7 +22,7 @@ export async function getStock(id) {
   return mapStock(data);
 }
 
-export async function addStock({ name, code, status = 'holding', shares = '', costPrice = '', currentPrice = '', thesis = '', bullCase = '', bearCase = '' }) {
+export async function addStock({ name, code, status = 'holding', shares = '', costPrice = '', currentPrice = '', thesis = '', bullCase = '', bearCase = '', type = 'stock' }) {
   const { data, error } = await supabase
     .from('stocks')
     .insert({
@@ -35,6 +35,7 @@ export async function addStock({ name, code, status = 'holding', shares = '', co
       thesis,
       bull_case: bullCase,
       bear_case: bearCase,
+      type,
     })
     .select()
     .single();
@@ -53,6 +54,7 @@ export async function updateStock(id, updates) {
   if (updates.thesis !== undefined) dbUpdates.thesis = updates.thesis;
   if (updates.bullCase !== undefined) dbUpdates.bull_case = updates.bullCase;
   if (updates.bearCase !== undefined) dbUpdates.bear_case = updates.bearCase;
+  if (updates.type !== undefined) dbUpdates.type = updates.type;
 
   const { data, error } = await supabase
     .from('stocks')
@@ -502,6 +504,7 @@ function mapStock(row) {
     thesis: row.thesis || '',
     bullCase: row.bull_case || '',
     bearCase: row.bear_case || '',
+    type: row.type || 'stock',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
